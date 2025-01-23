@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  User
+}
+
+enum Agama {
+  Islam
+  Kristen_Protestan
+  Budha
+  Konghucu
+  Hindu
+  Katolik
+}
+
+enum UnitKerja {
+  Umum
+  IT
+  Diseminasi
+  Teknikal
+}
+
+enum StatusSertifikat {
+  Pending
+  Selesai
+}
+
+enum TipeNotifikasiPeserta {
+  Tugas
+  Sertifikat
+}
+
+enum TipeNotifikasiPegawai {
+  Tugas
+  Kelompok
+}
+
+enum RolePegawai {
+  Admin
+  Pegawai
+}
+
+enum StatusKelompok {
+  Pending
+  Ditolak
+  Diterima
+}
+
+enum StatusTugas {
+  Pending
+  Selesai
+  Terlambat
+}
+
+model Kelompok {
+  id              String         @id @default(uuid()) @db.Uuid
+  nomor_kelompok  String?        @db.VarChar(255)
+  email           String         @unique @db.VarChar(255)
+  nama_ketua      String         @db.VarChar(255)
+  jumlah_anggota  Int
+  instansi        String         @db.VarChar(255)
+  surat_pengantar String         @db.Text
+  surat_balasan   String?        @db.Text
+  status          StatusKelompok @default(Pending)
+  createdAt       DateTime
+  updatedAt       DateTime
+
+  peserta Peserta[]
+}
+
+model Peserta {
+  id                String            @id @default(uuid()) @db.Uuid
+  id_kelompok       String            @db.Uuid
+  email             String            @unique @db.VarChar(255)
+  password          String            @db.VarChar(255)
+  nama              String            @db.VarChar(255)
+  nim               String            @unique @db.VarChar(255)
+  jurusan           String            @db.VarChar(255)
+  role              Role              @default(User)
+  nama_penggilan    String?           @db.VarChar(255)
+  tempat_lahir      String?           @db.VarChar(255)
+  tanggal_lahir     DateTime?
+  anak_ke           Int?
+  jumlah_saudara    Int?
+  ip                Float?
+  nama_ibu          String?           @db.VarChar(255)
+  pekerjaan_ibu     String?           @db.VarChar(255)
+  nama_ayah         String?           @db.VarChar(255)
+  pekerjaan_ayah    String?           @db.VarChar(255)
+  agama             Agama?
+  no_hp             String?           @db.VarChar(255)
+  alamat            String?           @db.VarChar(255)
+  alamat_domisili   String?           @db.VarChar(255)
+  alasan            String?           @db.VarChar(255)
+  jadwal_mulai      DateTime?
+  jadwal_selesai    DateTime?
+  keahlian          String?           @db.VarChar(255)
+  unit_kerja        UnitKerja?
+  foto              String?           @db.Text
+  nomor_peserta     String            @unique @db.VarChar(255)
+  sertifikat        String?           @db.Text
+  status_sertifikat StatusSertifikat?
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  kelompok          Kelompok            @relation(fields: [id_kelompok], references: [id])
+  Otp               Otp[]
+  RiwayatPendidikan RiwayatPendidikan[]
+  Tugas             Tugas[]
+  NotifikasiPeserta NotifikasiPeserta[]
+}
+
+model Otp {
+  id        String    @id @default(uuid()) @db.Uuid
+  id_user   String    @db.Uuid
+  kode      String    @unique @db.VarChar(255)
+  expiredAt DateTime?
+  status    Boolean?
+  createdAt DateTime
+  updatedAt DateTime
+
+  peserta Peserta @relation(fields: [id_user], references: [id])
+}
+
+model RiwayatPendidikan {
+  id           String   @id @default(uuid()) @db.Uuid
+  id_peserta   String   @db.Uuid
+  nama_sekolah String   @db.VarChar(255)
+  tempat       String   @db.VarChar(255)
+  tahun_tempat String   @db.VarChar(255)
+  createdAt    DateTime
+  updatedAt    DateTime
+
+  peserta Peserta @relation(fields: [id_peserta], references: [id])
+}
+
+model Pegawai {
+  id                String              @id @default(uuid()) @db.Uuid
+  email             String              @unique @db.VarChar(255)
+  password          String              @db.VarChar(255)
+  nama              String              @db.VarChar(255)
+  nip               String              @db.VarChar(255)
+  jabatan           String              @db.VarChar(255)
+  role              RolePegawai
+  createdAt         DateTime
+  updatedAt         DateTime
+  Tugas             Tugas[]
+  NotifikasiPegawai NotifikasiPegawai[]
+}
+
+model Tugas {
+  id         String      @id @default(uuid()) @db.Uuid
+  id_peserta String      @db.Uuid
+  id_pegawai String      @db.Uuid
+  deskripsi  String      @db.VarChar(255)
+  status     StatusTugas
+  deadline   DateTime
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  peserta Peserta @relation(fields: [id_peserta], references: [id])
+  pegawai Pegawai @relation(fields: [id_pegawai], references: [id])
+}
+
+model NotifikasiPeserta {
+  id         String                @id @default(uuid()) @db.Uuid
+  id_peserta String                @db.Uuid
+  tipe       TipeNotifikasiPeserta
+  pesan      String                @db.VarChar(255)
+  status     Boolean?
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  peserta Peserta @relation(fields: [id_peserta], references: [id])
+}
+
+model NotifikasiPegawai {
+  id         String                @id @default(uuid()) @db.Uuid
+  id_peserta String                @db.Uuid
+  tipe       TipeNotifikasiPegawai
+  pesan      String                @db.VarChar(255)
+  status     Boolean?
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  pegawai Pegawai @relation(fields: [id_peserta], references: [id])
+}
