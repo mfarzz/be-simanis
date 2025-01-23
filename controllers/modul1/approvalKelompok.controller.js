@@ -17,7 +17,7 @@ const rejectKelompok = async (req, res) => {
             where: { id: id },
         });
 
-        console.log(kelompok);
+
         if (!kelompok) {
             return res
                 .status(404)
@@ -29,26 +29,20 @@ const rejectKelompok = async (req, res) => {
                 .json({ error: "Bad Request - Kelompok sudah ditolak" });
         }
 
-        try {
-            await transporter.sendMail({
-                from: EMAIL_USER,
-                to: kelompok.email,
-                subject: "Informasi Pendaftaran Kelompok Anda",
-                text: `Yth. Kelompok ${kelompok.nama_ketua},
-                
-                Dengan hormat,
+        await transporter.sendMail({
+            from: EMAIL_USER,
+            to: kelompok.email,
+            subject: "Informasi Pendaftaran Kelompok",
+            text: `Yth. Kelompok ${kelompok.nama_ketua},
+Dengan hormat,
 
-                Kami sampaikan permohonan maaf bahwa pendaftaran kelompok Anda belum dapat kami terima. Untuk informasi lebih lanjut mengenai alasan penolakan, Anda dapat menghubungi panitia melalui kontak yang tersedia.
+Kami sampaikan permohonan maaf bahwa pendaftaran kelompok Anda belum dapat kami terima. Untuk informasi lebih lanjut mengenai alasan penolakan, Anda dapat menghubungi panitia melalui kontak yang tersedia.
 
-                Kami mengucapkan terima kasih atas pengertian dan partisipasi Anda.
+Kami mengucapkan terima kasih atas pengertian dan partisipasi Anda.
 
-                Hormat kami,
-                Badan Pusat Statistik Sumatera Barat`,
-            });
-        } catch (emailError) {
-            console.error("Email Error:", emailError);
-            return res.status(500).json({ error: "Failed to send email" });
-        }
+Hormat kami,
+Badan Pusat Statistik Sumatera Barat`,
+        });
 
         await prisma.kelompok.update({
             where: { id: id },
