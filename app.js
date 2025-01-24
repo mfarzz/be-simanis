@@ -10,6 +10,7 @@ var dotenv = require('dotenv');
 var pesertaRouter = require('./routes/peserta.router');
 var authRouter = require('./routes/auth.router');
 var pegawaiRouter = require('./routes/pegawai.router');
+var adminRouter = require('./routes/admin.router')
 
 var app = express();
 
@@ -39,6 +40,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 
 app.use('/auth', authRouter);
 app.use('/peserta', pesertaRouter);
+app.use('/admin',adminRouter)
 app.use('/pegawai', pegawaiRouter);
 
 // catch 404 and forward to error handler
