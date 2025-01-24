@@ -104,7 +104,7 @@ model Peserta {
   keahlian          String?           @db.VarChar(255)
   unit_kerja        UnitKerja?
   foto              String?           @db.Text
-  nomor_peserta     String            @unique @db.VarChar(255)
+  nomor_peserta     String?           @unique @db.VarChar(255)
   sertifikat        String?           @db.Text
   status_sertifikat StatusSertifikat?
   createdAt         DateTime
@@ -160,13 +160,13 @@ model Tugas {
   id_peserta String      @db.Uuid
   id_pegawai String      @db.Uuid
   deskripsi  String      @db.VarChar(255)
+  catatan    String?     @db.VarChar(255)
   status     StatusTugas
   deadline   DateTime
-  createdAt  DateTime
-  updatedAt  DateTime
-
-  peserta Peserta @relation(fields: [id_peserta], references: [id])
-  pegawai Pegawai @relation(fields: [id_pegawai], references: [id])
+  createdAt  DateTime    @default(now()) @db.Timestamptz
+  updatedAt  DateTime    @updatedAt @db.Timestamptz
+  peserta    Peserta     @relation(fields: [id_peserta], references: [id])
+  pegawai    Pegawai     @relation(fields: [id_pegawai], references: [id])
 }
 
 model NotifikasiPeserta {

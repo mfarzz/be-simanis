@@ -1,9 +1,14 @@
 var express = require('express');
 var router = express.Router();
 var { auth } = require('../middlewares/auth.middleware');
-var { approveKelompok, rejectKelompok } = require('../controllers/modul1/approvalKelompok.controller');
+var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 
-router.put('/approve-user/:id', auth(['Admin']), approveKelompok);
-router.put('/reject-user/:id', auth(['Admin']), rejectKelompok);
+
+//tugas
+router.post('/add-tugas/:pesertaId', auth(['Pegawai']),createTugas)
+router.put('/edit-tugas/:tugasId', auth(['Pegawai']),editTugas)
+router.delete('/delete-tugas/:tugasId', auth(['Pegawai']), deleteTugas);
+router.get('/list-tugas', auth(['Pegawai']), getAllTugas);
+
 
 module.exports = router;

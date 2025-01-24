@@ -1,6 +1,15 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 const fs = require("fs");
+const bcrypt = require("bcrypt");
+const { v4: uuidv4 } = require('uuid');
+
+
+const hashPassword = async (password) => {
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
+};
+
 
 const registerKelompok = async (req, res) => {
     try {
@@ -55,6 +64,73 @@ const registerKelompok = async (req, res) => {
     }
 }
 
+const registerPeserta = async (req, res) => {
+    const { nomor_kelompok, email, password, nama, nim, jurusan } = req.body;
+ 
+    try {
+        // Cek status kelompok
+        const kelompok = await prisma.kelompok.findFirst({
+            where: { 
+                nomor_kelompok,
+                status: "Diterima" // Hanya kelompok yang sudah diterima
+            }
+        });
+ 
+        if (!kelompok) {
+            return res.status(404).json({ error: "Nomor kelompok tidak valid atau kelompok belum diterima" });
+        }
+ 
+        // Cek duplikat email
+        const emailExists = await prisma.peserta.findUnique({ where: { email } });
+        if (emailExists) {
+            return res.status(400).json({ error: "Email sudah terdaftar" });
+        }
+ 
+        // Cek duplikat NIM 
+        const nimExists = await prisma.peserta.findUnique({ where: { nim } });
+        if (nimExists) {
+            return res.status(400).json({ error: "NIM sudah terdaftar" });
+        }
+ 
+        // Cek jumlah anggota
+        const jumlahPeserta = await prisma.peserta.count({
+            where: { id_kelompok: kelompok.id }
+        });
+ 
+        if (jumlahPeserta >= kelompok.jumlah_anggota) {
+            return res.status(400).json({ error: "Jumlah maksimal peserta sudah tercapai" });
+        }
+ 
+        const hashedPassword = await hashPassword(password);
+        
+        // Remove nomor_peserta field
+        const peserta = await prisma.peserta.create({
+            data: {
+                id_kelompok: kelompok.id,
+                email,
+                password: hashedPassword,
+                nama,
+                nim,
+                jurusan,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+        });
+
+        return res.status(201).json({
+            message: "Registrasi peserta berhasil",
+            data: peserta
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+
+
 module.exports = {
-    registerKelompok
+    registerKelompok,
+    registerPeserta
 }
