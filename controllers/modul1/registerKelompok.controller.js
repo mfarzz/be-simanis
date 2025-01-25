@@ -103,7 +103,7 @@ const registerPeserta = async (req, res) => {
  
         const hashedPassword = await hashPassword(password);
         
-        // Remove nomor_peserta field
+        // Buat peserta dengan kolom status_sertifikat default "Pending"
         const peserta = await prisma.peserta.create({
             data: {
                 id_kelompok: kelompok.id,
@@ -112,6 +112,7 @@ const registerPeserta = async (req, res) => {
                 nama,
                 nim,
                 jurusan,
+                status_sertifikat: "Pending", // Kolom default
                 createdAt: new Date(),
                 updatedAt: new Date()
             }
@@ -127,6 +128,7 @@ const registerPeserta = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
 
 
 

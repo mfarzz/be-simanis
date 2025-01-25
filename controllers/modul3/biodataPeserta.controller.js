@@ -1,6 +1,36 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
+const getBiodata = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "User tidak terautentikasi" });
+    }
+
+    try {
+        const biodata = await prisma.peserta.findUnique({
+            where: { id: req.user.id },
+            include: {
+                RiwayatPendidikan: true
+            }
+        });
+
+        if (!biodata) {
+            return res.status(404).json({ error: "Biodata tidak ditemukan" });
+        }
+
+        res.status(200).json({
+            message: "Biodata berhasil diambil",
+            data: biodata
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Terjadi kesalahan saat mengambil biodata",
+            details: error.message
+        });
+    }
+};
+
 const addBiodata = async (req, res) => {
     const {
         nama_penggilan, tempat_lahir, tanggal_lahir, anak_ke, jumlah_saudara,
@@ -128,5 +158,6 @@ const deleteBiodata = async (req, res) => {
 
 module.exports = {
     addBiodata,
-    deleteBiodata
+    deleteBiodata,
+    getBiodata
 };

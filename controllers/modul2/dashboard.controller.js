@@ -41,32 +41,48 @@ const getUnitKerjaStatistics = async (req, res) => {
 };
 
 
-// Statistik Harian
 const getStatistikHarian = async (req, res) => {
     try {
         const now = new Date();
+        const startDate = new Date(now.setDate(now.getDate() - 7)); // Tanggal 7 hari terakhir
+
+        // Query untuk mengambil data berdasarkan tanggal saja
         const harian = await prisma.peserta.groupBy({
             by: ['createdAt'],
             where: {
                 createdAt: {
-                    gte: new Date(now.setDate(now.getDate() - 7))
+                    gte: startDate
                 }
             },
             _count: true
         });
- 
+
+        // Map data untuk mengelompokkan berdasarkan tanggal saja
+        const groupedByDate = harian.reduce((acc, item) => {
+            const dateKey = item.createdAt.toISOString().split('T')[0]; // Ambil tanggal saja
+            if (!acc[dateKey]) {
+                acc[dateKey] = 0;
+            }
+            acc[dateKey] += item._count;
+            return acc;
+        }, {});
+
+        // Format data menjadi array
+        const result = Object.keys(groupedByDate).map(date => ({
+            tanggal: date,
+            jumlah: groupedByDate[date]
+        }));
+
         return res.status(200).json({
             message: "Statistik harian berhasil diambil",
-            data: harian.map(h => ({
-                tanggal: h.createdAt,
-                jumlah: h._count
-            }))
+            data: result
         });
     } catch (error) {
         console.error("Error:", error);
         return res.status(500).json({ message: "Internal Server Error" });
     }
- };
+};
+
  
  // Statistik Bulanan
  const getStatistikBulanan = async (req, res) => {

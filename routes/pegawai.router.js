@@ -5,10 +5,10 @@ var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/
 
 
 //tugas
+router.get('/list-tugas', auth(['Pegawai']), getAllTugas);
 router.post('/add-tugas/:pesertaId', auth(['Pegawai']),createTugas)
 router.put('/edit-tugas/:tugasId', auth(['Pegawai']),editTugas)
 router.delete('/delete-tugas/:tugasId', auth(['Pegawai']), deleteTugas);
-router.get('/list-tugas', auth(['Pegawai']), getAllTugas);
 
 
 module.exports = router;
