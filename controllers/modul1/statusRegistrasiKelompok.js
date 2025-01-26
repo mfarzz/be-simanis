@@ -98,36 +98,30 @@ const rejectKelompok = async (req, res) => {
 
 const approveKelompok = async (req, res) => {
     const { id } = req.params;
-
     // Validasi ID
     if (!id) {
         return res
             .status(400)
             .json({ error: "Bad Request - Missing required fields" });
     }
-
     try {
         // Cek keberadaan kelompok berdasarkan ID
         const kelompok = await prisma.kelompok.findUnique({
             where: { id: id },
         });
-
         if (!kelompok) {
             return res
                 .status(404)
                 .json({ error: "Not Found - Kelompok not found" });
         }
-
         // Cek status kelompok
         if (kelompok.status === "Diterima") {
             return res
                 .status(400)
                 .json({ error: "Bad Request - Kelompok sudah diterima" });
         }
-
         // Generate nomor kelompok
         const nomor_kelompok = `${kelompok.instansi}-${uuidv4().slice(0, 8)}`;
-
         // Update status kelompok di database
         await prisma.kelompok.update({
             where: { id: id },
@@ -136,28 +130,27 @@ const approveKelompok = async (req, res) => {
                 nomor_kelompok,
             },
         });
-
         // Konfigurasi email
         const mailOptions = {
             from: EMAIL_USER,
             to: kelompok.email,
             subject: "Konfirmasi Pendaftaran Kelompok Anda",
-            text: `Yth. Kelompok ${kelompok.nama_ketua},
-
+            html: `Yth. Kelompok ${kelompok.nama_ketua},
+<br><br>
 Dengan hormat,
-
+<br><br>
 Selamat! Pendaftaran kelompok Anda telah berhasil kami terima. Berikut adalah informasi kelompok Anda:
-
-Nomor Kelompok: ${nomor_kelompok}
-
+<br><br>
+Nomor Kelompok: <b>${nomor_kelompok}</b>
+<br><br>
 Harap menyimpan nomor kelompok ini untuk keperluan administrasi lebih lanjut. Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi kami.
-
+<br><br>
 Terima kasih atas partisipasi Anda.
-
+<br><br>
 Hormat kami,
+<br>
 Badan Pusat Statistik Sumatera Barat`,
         };
-
         // Kirim email konfirmasi
         try {
             await transporter.sendMail(mailOptions);
@@ -167,7 +160,6 @@ Badan Pusat Statistik Sumatera Barat`,
                 .status(500)
                 .json({ error: "Failed to send email confirmation" });
         }
-
         // Berikan respons sukses
         return res.status(200).json({ message: "Kelompok berhasil diterima" });
     } catch (error) {

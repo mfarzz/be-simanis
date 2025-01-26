@@ -5,12 +5,10 @@ var { approveKelompok, rejectKelompok, getKelompokList } = require('../controlle
 const { getAllBiodata, addBiodata,deleteBiodata } = require('../controllers/modul3/managementBiodata');
 var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 var {getUnitKerjaStatistics, getStatistikHarian,getStatistikBulanan,getStatistikTahunan} = require('../controllers/modul2/dashboard.controller')
-var {uploadTemplate, getAllTemplates, chooseOneTemplate, deleteTemplate, generateSertifikat, downloadSertifikat} = require('../controllers/modul3/sertifikatManagement')
+var {uploadTemplate, getAllTemplates, chooseOneTemplate, deleteTemplate, generateSertifikat, downloadSertifikat, editTemplate} = require('../controllers/modul3/sertifikatManagement')
 
 var { upload } = require('../middlewares/foto.middleware');
 const templates = require('../middlewares/template.middleware');
-
-
 
 //register
 router.get('/list-kelompok',auth(['Admin']),getKelompokList)
@@ -22,13 +20,11 @@ router.get('/list-biodata',auth(['Admin']), getAllBiodata)
 router.put('/add-biodata/:pesertaId',upload,auth(['Admin']),addBiodata)
 router.delete('/delete-biodata/:pesertaId', auth(['Admin']), deleteBiodata);
 
-
 //tugas
 router.get('/list-tugas', auth(['Admin']), getAllTugas);
 router.post('/add-tugas/:pesertaId', auth(['Admin']),createTugas)
 router.put('/edit-tugas/:tugasId', auth(['Admin']),editTugas)
 router.delete('/delete-tugas/:tugasId', auth(['Admin']), deleteTugas);
-
 
 //dashboard
 router.get('/unit-kerja-statistics',auth(['Admin']),getUnitKerjaStatistics);
@@ -38,6 +34,7 @@ router.get('/statistik-tahunan', auth(['Admin']), getStatistikTahunan);
 
 //sertifikat
 router.post('/upload-template', auth(['Admin']), templates.single('file'), uploadTemplate);
+router.patch('/edit-template/:id', auth(['Admin']), templates.single('file'),editTemplate)
 router.get('/list-template', auth(['Admin']), getAllTemplates)
 router.patch('/choose-template/:id', auth(['Admin']), chooseOneTemplate);
 router.delete('/delete-template/:id', auth(['Admin']), deleteTemplate);
