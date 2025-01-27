@@ -5,6 +5,8 @@ const {
     EMAIL_USER,
 } = require("../../middlewares/transporter.middleware");
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
 
 
 const getKelompokList = async (req, res) => {
@@ -17,6 +19,8 @@ const getKelompokList = async (req, res) => {
                 instansi: true,
                 email: true,
                 status: true,
+                surat_balasan: true,
+                surat_pengantar: true,
             },
         });
 
@@ -98,36 +102,30 @@ const rejectKelompok = async (req, res) => {
 
 const approveKelompok = async (req, res) => {
     const { id } = req.params;
-
     // Validasi ID
     if (!id) {
         return res
             .status(400)
             .json({ error: "Bad Request - Missing required fields" });
     }
-
     try {
         // Cek keberadaan kelompok berdasarkan ID
         const kelompok = await prisma.kelompok.findUnique({
             where: { id: id },
         });
-
         if (!kelompok) {
             return res
                 .status(404)
                 .json({ error: "Not Found - Kelompok not found" });
         }
-
         // Cek status kelompok
         if (kelompok.status === "Diterima") {
             return res
                 .status(400)
                 .json({ error: "Bad Request - Kelompok sudah diterima" });
         }
-
         // Generate nomor kelompok
         const nomor_kelompok = `${kelompok.instansi}-${uuidv4().slice(0, 8)}`;
-
         // Update status kelompok di database
         await prisma.kelompok.update({
             where: { id: id },
@@ -136,28 +134,27 @@ const approveKelompok = async (req, res) => {
                 nomor_kelompok,
             },
         });
-
         // Konfigurasi email
         const mailOptions = {
             from: EMAIL_USER,
             to: kelompok.email,
             subject: "Konfirmasi Pendaftaran Kelompok Anda",
-            text: `Yth. Kelompok ${kelompok.nama_ketua},
-
+            html: `Yth. Kelompok ${kelompok.nama_ketua},
+<br><br>
 Dengan hormat,
-
+<br><br>
 Selamat! Pendaftaran kelompok Anda telah berhasil kami terima. Berikut adalah informasi kelompok Anda:
-
-Nomor Kelompok: ${nomor_kelompok}
-
+<br><br>
+Nomor Kelompok: <b>${nomor_kelompok}</b>
+<br><br>
 Harap menyimpan nomor kelompok ini untuk keperluan administrasi lebih lanjut. Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi kami.
-
+<br><br>
 Terima kasih atas partisipasi Anda.
-
+<br><br>
 Hormat kami,
+<br>
 Badan Pusat Statistik Sumatera Barat`,
         };
-
         // Kirim email konfirmasi
         try {
             await transporter.sendMail(mailOptions);
@@ -167,7 +164,6 @@ Badan Pusat Statistik Sumatera Barat`,
                 .status(500)
                 .json({ error: "Failed to send email confirmation" });
         }
-
         // Berikan respons sukses
         return res.status(200).json({ message: "Kelompok berhasil diterima" });
     } catch (error) {
@@ -176,5 +172,109 @@ Badan Pusat Statistik Sumatera Barat`,
     }
 };
 
+const searchKelompok = async (req, res) => {
+    try {
+        const { query } = req.query;
+        
+        if (!query) {
+            const allKelompok = await prisma.kelompok.findMany({
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            });
+            return res.json(allKelompok);
+        }
 
-module.exports = { rejectKelompok, approveKelompok, getKelompokList };
+        const searchResults = await prisma.kelompok.findMany({
+            where: {
+                OR: [
+                    {
+                        email: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        nama_ketua: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        instansi: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    }
+                ]
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        res.json(searchResults);
+    } catch (error) {
+        console.error("Search Kelompok Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+const previewDocument = async (req, res) => {
+    try {
+        const { filename } = req.params;
+        
+        // Extract document type from filename
+        const isBalasan = filename.includes('surat_balasan');
+        const folderName = isBalasan ? 'suratBalasan' : 'suratPengantar';
+        
+        // Construct path sesuai struktur folder
+        const filePath = path.join(process.cwd(), 'uploads', folderName, filename);
+
+        // Debug log
+        console.log('Accessing file:', filePath);
+
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+            console.log('File not found:', filePath);
+            return res.status(404).json({ 
+                error: 'File not found',
+                path: filePath
+            });
+        }
+
+        // Get file extension
+        const ext = path.extname(filePath).toLowerCase();
+        
+        // Set appropriate content type
+        const contentType = {
+            '.pdf': 'application/pdf',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png'
+        }[ext] || 'application/octet-stream';
+
+        // Set response headers
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.on('error', error => {
+            console.error('Error streaming file:', error);
+            res.status(500).json({ error: 'Error streaming file' });
+        });
+
+        fileStream.pipe(res);
+
+    } catch (error) {
+        console.error("Preview Document Error:", error);
+        res.status(500).json({ 
+            error: "Internal Server Error",
+            details: error.message 
+        });
+    }
+};
+
+
+module.exports = { rejectKelompok, approveKelompok, getKelompokList,searchKelompok,previewDocument };

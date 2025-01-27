@@ -32,6 +32,40 @@ const uploadTemplate = async (req, res) => {
     }
 };
 
+const editTemplate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nama } = req.body;
+        const filePath = req.file?.path;
+ 
+        const existingTemplate = await prisma.templateSertifikat.findUnique({
+            where: { id }
+        });
+ 
+        if (!existingTemplate) {
+            return res.status(404).json({ error: 'Template tidak ditemukan' });
+        }
+ 
+        const updateData = {
+            ...(nama && { nama }),
+            ...(filePath && { file_path: filePath })
+        };
+ 
+        const template = await prisma.templateSertifikat.update({
+            where: { id },
+            data: updateData
+        });
+ 
+        res.status(200).json({
+            message: 'Template berhasil diperbarui',
+            template
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Gagal memperbarui template' });
+    }
+ };
+
 
 const getAllTemplates = async (req, res) => {
     try {
@@ -126,22 +160,27 @@ const deleteTemplate = async (req, res) => {
         const peserta = await prisma.peserta.findUnique({
             where: { id: pesertaId },
             include: {
-                kelompok: true // Include kelompok data
+                kelompok: true,
+                template: true 
             }
         });
-
-        // Validasi jika nama_penggilan kosong atau null
+ 
         if (!peserta.nama_penggilan) {
             return res.status(400).json({
                 error: 'Nama penggilan / biodata lengkap peserta belum diisi. Sertifikat tidak dapat digenerate.'
             });
         }
  
-        const activeTemplate = await prisma.templateSertifikat.findFirst({
+        const selectedTemplate = await prisma.templateSertifikat.findFirst({
             where: { status: 'Sedang Digunakan' }
         });
  
-        // Generate nomor peserta
+        if (!selectedTemplate) {
+            return res.status(400).json({
+                error: 'Template sertifikat belum dipilih atau tidak ada template aktif'
+            });
+        }
+ 
         const latestPeserta = await prisma.peserta.findFirst({
             where: { nomor_peserta: { not: null } },
             orderBy: { nomor_peserta: 'desc' }
@@ -153,42 +192,48 @@ const deleteTemplate = async (req, res) => {
         }
         const nomor_peserta = String(nextNumber).padStart(3, '0');
  
-        // Process template
-        const content = fs.readFileSync(activeTemplate.file_path, 'binary');
+        const content = fs.readFileSync(selectedTemplate.file_path, 'binary');
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip);
  
-        doc.setData({
+        doc.render({
             nama: peserta.nama,
-            jadwal_mulai: new Date(peserta.jadwal_mulai).toLocaleDateString('id-ID'),
-            jadwal_selesai: new Date(peserta.jadwal_selesai).toLocaleDateString('id-ID'),
+            jadwal_mulai: new Date(peserta.jadwal_mulai).toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            }),
+            jadwal_selesai: new Date(peserta.jadwal_selesai).toLocaleDateString('id-ID', {
+                day: 'numeric', 
+                month: 'long',
+                year: 'numeric'
+            }),
             no_peserta: nomor_peserta,
             jurusan: peserta.jurusan,
             universitas: peserta.kelompok.instansi,
             tahun: new Date(peserta.jadwal_selesai).getFullYear()
-         });
-
-        doc.render();
-
+        });
+ 
         const buffer = doc.getZip().generate({type: 'nodebuffer'});
         const newPath = `uploads/sertifikat/${Date.now()}-sertifikat.docx`;
         fs.writeFileSync(newPath, buffer);
-
+ 
         await prisma.peserta.update({
             where: { id: pesertaId },
             data: {
                 nomor_peserta,
                 sertifikat: newPath,
-                status_sertifikat: 'Selesai'
+                status_sertifikat: 'Selesai',
+                template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id
             }
         });
-
+ 
         res.status(200).json({ message: 'Sertifikat berhasil digenerate' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Gagal generate sertifikat' });
     }
-};
+ };
 
 
  const downloadSertifikat = async (req, res) => {
@@ -261,6 +306,7 @@ const deleteTemplate = async (req, res) => {
 
 module.exports = {
     uploadTemplate,
+    editTemplate,
     getAllTemplates,
     chooseOneTemplate,
     deleteTemplate,

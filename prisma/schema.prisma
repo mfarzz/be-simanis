@@ -107,8 +107,12 @@ model Peserta {
   nomor_peserta     String?           @unique @db.VarChar(255)
   sertifikat        String?           @db.Text
   status_sertifikat StatusSertifikat?
+  template_sertifikat_id String?           @db.Uuid
+  template               TemplateSertifikat? @relation(fields: [template_sertifikat_id], references: [id])
   createdAt         DateTime
   updatedAt         DateTime
+
+ 
 
   kelompok          Kelompok            @relation(fields: [id_kelompok], references: [id])
   Otp               Otp[]
@@ -124,6 +128,8 @@ model TemplateSertifikat {
   status            String   @default("Tidak Digunakan") // Status: Sedang Digunakan, Tidak Digunakan
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  Peserta           Peserta[]
+  
 }
 
 model Otp {
