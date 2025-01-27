@@ -5,6 +5,8 @@ const {
     EMAIL_USER,
 } = require("../../middlewares/transporter.middleware");
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
 
 
 const getKelompokList = async (req, res) => {
@@ -17,6 +19,8 @@ const getKelompokList = async (req, res) => {
                 instansi: true,
                 email: true,
                 status: true,
+                surat_balasan: true,
+                surat_pengantar: true,
             },
         });
 
@@ -168,5 +172,109 @@ Badan Pusat Statistik Sumatera Barat`,
     }
 };
 
+const searchKelompok = async (req, res) => {
+    try {
+        const { query } = req.query;
+        
+        if (!query) {
+            const allKelompok = await prisma.kelompok.findMany({
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            });
+            return res.json(allKelompok);
+        }
 
-module.exports = { rejectKelompok, approveKelompok, getKelompokList };
+        const searchResults = await prisma.kelompok.findMany({
+            where: {
+                OR: [
+                    {
+                        email: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        nama_ketua: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        instansi: {
+                            contains: query,
+                            mode: 'insensitive'
+                        }
+                    }
+                ]
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        res.json(searchResults);
+    } catch (error) {
+        console.error("Search Kelompok Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+const previewDocument = async (req, res) => {
+    try {
+        const { filename } = req.params;
+        
+        // Extract document type from filename
+        const isBalasan = filename.includes('surat_balasan');
+        const folderName = isBalasan ? 'suratBalasan' : 'suratPengantar';
+        
+        // Construct path sesuai struktur folder
+        const filePath = path.join(process.cwd(), 'uploads', folderName, filename);
+
+        // Debug log
+        console.log('Accessing file:', filePath);
+
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+            console.log('File not found:', filePath);
+            return res.status(404).json({ 
+                error: 'File not found',
+                path: filePath
+            });
+        }
+
+        // Get file extension
+        const ext = path.extname(filePath).toLowerCase();
+        
+        // Set appropriate content type
+        const contentType = {
+            '.pdf': 'application/pdf',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png'
+        }[ext] || 'application/octet-stream';
+
+        // Set response headers
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.on('error', error => {
+            console.error('Error streaming file:', error);
+            res.status(500).json({ error: 'Error streaming file' });
+        });
+
+        fileStream.pipe(res);
+
+    } catch (error) {
+        console.error("Preview Document Error:", error);
+        res.status(500).json({ 
+            error: "Internal Server Error",
+            details: error.message 
+        });
+    }
+};
+
+
+module.exports = { rejectKelompok, approveKelompok, getKelompokList,searchKelompok,previewDocument };

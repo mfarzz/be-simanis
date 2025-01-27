@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { auth } = require('../middlewares/auth.middleware');
-var { approveKelompok, rejectKelompok, getKelompokList } = require('../controllers/modul1/statusRegistrasiKelompok');
+var { approveKelompok, rejectKelompok, getKelompokList, searchKelompok, previewDocument } = require('../controllers/modul1/statusRegistrasiKelompok');
 const { getAllBiodata, addBiodata,deleteBiodata } = require('../controllers/modul3/managementBiodata');
 var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 var {getUnitKerjaStatistics, getStatistikHarian,getStatistikBulanan,getStatistikTahunan} = require('../controllers/modul2/dashboard.controller')
@@ -14,6 +14,8 @@ const templates = require('../middlewares/template.middleware');
 router.get('/list-kelompok',auth(['Admin']),getKelompokList)
 router.put('/approve-user/:id', auth(['Admin']), approveKelompok);
 router.put('/reject-user/:id', auth(['Admin']), rejectKelompok);
+router.get('/search-kelompok', auth(['Admin']), searchKelompok); //modul pengarsipan surat bisa seacrhing berdasarkan gmail, nama ketua, dan instansi
+router.get('/preview-surat/:filename', auth(['Admin']), previewDocument);
 
 //biodata
 router.get('/list-biodata',auth(['Admin']), getAllBiodata)
