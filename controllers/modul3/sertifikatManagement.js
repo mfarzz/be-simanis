@@ -1,5 +1,9 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
+const {
+    transporter,
+    EMAIL_USER,
+} = require("../../middlewares/transporter.middleware");
 
 
 const uploadTemplate = async (req, res) => {
@@ -150,13 +154,15 @@ const deleteTemplate = async (req, res) => {
  };
 
 
- const generateSertifikat = async (req, res) => {
+const Docxtemplater = require('docxtemplater');
+const PizZip = require('pizzip');
+const fs = require('fs');
+
+const generateSertifikat = async (req, res) => {
     try {
-        const Docxtemplater = require('docxtemplater');
-        const PizZip = require('pizzip');
-        const fs = require('fs');
         const { pesertaId } = req.params;
- 
+
+        // Ambil data peserta dengan include kelompok dan template
         const peserta = await prisma.peserta.findUnique({
             where: { id: pesertaId },
             include: {
@@ -164,76 +170,205 @@ const deleteTemplate = async (req, res) => {
                 template: true 
             }
         });
- 
+
         if (!peserta.nama_penggilan) {
             return res.status(400).json({
                 error: 'Nama penggilan / biodata lengkap peserta belum diisi. Sertifikat tidak dapat digenerate.'
             });
         }
- 
+
         const selectedTemplate = await prisma.templateSertifikat.findFirst({
             where: { status: 'Sedang Digunakan' }
         });
- 
+
         if (!selectedTemplate) {
             return res.status(400).json({
                 error: 'Template sertifikat belum dipilih atau tidak ada template aktif'
             });
         }
- 
+
         const latestPeserta = await prisma.peserta.findFirst({
             where: { nomor_peserta: { not: null } },
             orderBy: { nomor_peserta: 'desc' }
         });
- 
+
         let nextNumber = 1;
         if (latestPeserta?.nomor_peserta) {
             nextNumber = parseInt(latestPeserta.nomor_peserta) + 1;
         }
         const nomor_peserta = String(nextNumber).padStart(3, '0');
- 
+
         const content = fs.readFileSync(selectedTemplate.file_path, 'binary');
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip);
- 
+
+        // Format tanggal untuk dokumen
+        const tanggalMulai = new Date(peserta.jadwal_mulai).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        const tanggalSelesai = new Date(peserta.jadwal_selesai).toLocaleDateString('id-ID', {
+            day: 'numeric', 
+            month: 'long',
+            year: 'numeric'
+        });
+
         doc.render({
             nama: peserta.nama,
-            jadwal_mulai: new Date(peserta.jadwal_mulai).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-            }),
-            jadwal_selesai: new Date(peserta.jadwal_selesai).toLocaleDateString('id-ID', {
-                day: 'numeric', 
-                month: 'long',
-                year: 'numeric'
-            }),
+            jadwal_mulai: tanggalMulai,
+            jadwal_selesai: tanggalSelesai,
             no_peserta: nomor_peserta,
             jurusan: peserta.jurusan,
             universitas: peserta.kelompok.instansi,
             tahun: new Date(peserta.jadwal_selesai).getFullYear()
         });
- 
+
         const buffer = doc.getZip().generate({type: 'nodebuffer'});
         const newPath = `uploads/sertifikat/${Date.now()}-sertifikat.docx`;
         fs.writeFileSync(newPath, buffer);
- 
+
+        // Update data peserta
         await prisma.peserta.update({
             where: { id: pesertaId },
             data: {
                 nomor_peserta,
                 sertifikat: newPath,
                 status_sertifikat: 'Selesai',
-                template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id
+                template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id,
+                status_peserta: 'Nonaktif' // Update status peserta menjadi Nonaktif
             }
         });
- 
-        res.status(200).json({ message: 'Sertifikat berhasil digenerate' });
+
+        // Buat notifikasi untuk peserta
+        await prisma.notifikasiPeserta.create({
+            data: {
+                id_peserta: pesertaId,
+                tipe: "Sertifikat",
+                pesan: `Sertifikat magang Anda telah selesai dibuat. Silahkan download di menu sertifikat.`,
+                status: false,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+        });
+
+        // Kirim email ke peserta
+        try {
+            const emailTemplate = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                        }
+                        .container {
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                            background-color: #f9f9f9;
+                        }
+                        .header {
+                            background-color: #0066cc;
+                            color: white;
+                            padding: 20px;
+                            text-align: center;
+                            border-radius: 5px 5px 0 0;
+                        }
+                        .content {
+                            background-color: white;
+                            padding: 20px;
+                            border-radius: 0 0 5px 5px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                        }
+                        .info-box {
+                            background-color: #f0f7ff;
+                            padding: 15px;
+                            border-left: 4px solid #0066cc;
+                            margin: 20px 0;
+                        }
+                        .footer {
+                            text-align: center;
+                            margin-top: 20px;
+                            padding-top: 20px;
+                            border-top: 1px solid #ddd;
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        .button {
+                            display: inline-block;
+                            padding: 10px 20px;
+                            background-color: #0066cc;
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin: 20px 0;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>SERTIFIKAT MAGANG TELAH TERSEDIA</h1>
+                            <p>Badan Pusat Statistik Sumatera Barat</p>
+                        </div>
+                        <div class="content">
+                            <p>Yth. ${peserta.nama},</p>
+                            
+                            <p>Kami dengan senang hati memberitahukan bahwa sertifikat magang Anda telah selesai diproses.</p>
+                            
+                            <div class="info-box">
+                                <h3>Informasi Peserta:</h3>
+                                <p><strong>Nomor Peserta:</strong> ${nomor_peserta}</p>
+                                <p><strong>Periode Magang:</strong> ${tanggalMulai} - ${tanggalSelesai}</p>
+                                <p><strong>Instansi:</strong> ${peserta.kelompok.instansi}</p>
+                                <p><strong>Jurusan:</strong> ${peserta.jurusan}</p>
+                            </div>
+
+                            <p>Sertifikat Anda dapat diunduh melalui aplikasi SIMANIS dengan mengikuti langkah berikut:</p>
+                            <ol>
+                                <li>Login ke aplikasi SIMANIS</li>
+                                <li>Akses menu Sertifikat</li>
+                                <li>Klik tombol Download untuk mengunduh sertifikat Anda</li>
+                            </ol>
+
+                            <p>Selamat atas penyelesaian program magang Anda!</p>
+                            
+                            <div class="footer">
+                                <p>Email ini dikirim secara otomatis oleh sistem SIMANIS BPS Sumatera Barat.</p>
+                                <p>© ${new Date().getFullYear()} Badan Pusat Statistik Sumatera Barat. All rights reserved.</p>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            await transporter.sendMail({
+                from: EMAIL_USER,
+                to: peserta.email,
+                subject: `[SIMANIS BPS] Sertifikat Magang - ${peserta.nama}`,
+                html: emailTemplate
+            });
+
+            res.status(200).json({ 
+                message: 'Sertifikat berhasil digenerate dan notifikasi telah dikirim ke peserta' 
+            });
+        } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            // Tetap return success karena sertifikat berhasil dibuat
+            res.status(200).json({ 
+                message: 'Sertifikat berhasil digenerate tetapi gagal mengirim email' 
+            });
+        }
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Gagal generate sertifikat' });
     }
- };
+};
 
 
  const downloadSertifikat = async (req, res) => {

@@ -10,5 +10,4 @@ router.post('/add-tugas/:pesertaId', auth(['Pegawai']),createTugas)
 router.put('/edit-tugas/:tugasId', auth(['Pegawai']),editTugas)
 router.delete('/delete-tugas/:tugasId', auth(['Pegawai']), deleteTugas);
 
-
 module.exports = router;

@@ -41,7 +41,8 @@ const registerKelompok = async (req, res) => {
         const suratPengantar = req.files.find(f => f.fieldname === 'surat_pengantar');
         const suratBalasan = req.files.find(f => f.fieldname === 'surat_balasan');
 
-        await prisma.kelompok.create({
+        // Membuat kelompok baru
+        const newKelompok = await prisma.kelompok.create({
             data: {
                 email,
                 nama_ketua,
@@ -54,6 +55,27 @@ const registerKelompok = async (req, res) => {
             }
         });
 
+        // Dapatkan semua admin untuk diberi notifikasi
+        const admins = await prisma.pegawai.findMany({
+            where: {
+                role: 'Admin'
+            }
+        });
+
+        // Buat notifikasi untuk setiap admin
+        await Promise.all(admins.map(admin => 
+            prisma.notifikasiPegawai.create({
+                data: {
+                    id_peserta: admin.id, // Di model ini id_peserta sebenarnya merujuk ke id pegawai
+                    tipe: 'Kelompok',
+                    pesan: `Kelompok baru mendaftar: ${instansi} - ${nama_ketua} (${jumlah_anggota} anggota)`,
+                    status: false, // belum dibaca
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                }
+            })
+        ));
+
         res.status(201).json({ message: "Kelompok created successfully" });
     } catch (error) {
         console.error("Register Kelompok Error:", error);
@@ -62,7 +84,7 @@ const registerKelompok = async (req, res) => {
         }
         return res.status(500).json({ error: "Internal Server Error" });
     }
-}
+};
 
 const registerPeserta = async (req, res) => {
     const { nomor_kelompok, email, password, nama, nim, jurusan } = req.body;
