@@ -3,6 +3,11 @@ const prisma = new PrismaClient();
 const bcrypt = require("bcrypt");
 const JWT_SECRET = process.env.JWT_SECRET;
 const jwt = require("jsonwebtoken");
+const nodemailer = require('nodemailer');
+const {
+    transporter,
+    EMAIL_USER,
+} = require("../../middlewares/transporter.middleware");
 
 const generateTokens = (user) => {
     const tokenPayload = {
@@ -124,4 +129,211 @@ const refreshAccessToken = async (req, res) => {
     }
 };
 
-module.exports = { login, logout, refreshAccessToken };
+const sendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                message: "Email harus diisi"
+            });
+        }
+
+        // Cek apakah email terdaftar
+        const user = await prisma.peserta.findFirst({
+            where: { email }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: "Email tidak terdaftar"
+            });
+        }
+
+        // Generate OTP 6 digit
+        const kode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Set waktu kadaluarsa OTP (5 menit dari sekarang)
+        const expiredAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        // Simpan OTP baru
+        await prisma.otp.create({
+            data: {
+                id_user: user.id,
+                kode,
+                expiredAt,
+                status: false,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+        });
+
+        // Konfigurasi email
+        const mailOptions = {
+            from: EMAIL_USER,
+            to: email,
+            subject: "Kode OTP untuk Reset Password",
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2>Reset Password - Kode OTP</h2>
+                    <br>
+                    <p>Yth. ${user.nama},</p>
+                    <br>
+                    <p>Berikut adalah kode OTP Anda untuk reset password:</p>
+                    <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px;">${kode}</h1>
+                    <p>Kode OTP ini akan kadaluarsa dalam 5 menit.</p>
+                    <br>
+                    <p>Jika Anda tidak meminta reset password, mohon abaikan email ini.</p>
+                    <br>
+                    <p>Hormat kami,</p>
+                    <p>Badan Pusat Statistik Sumatera Barat</p>
+                    <br>
+                    <p style="color: #666; font-size: 12px;">Email ini dikirim secara otomatis, mohon tidak membalas email ini.</p>
+                </div>
+            `
+        };
+
+        // Kirim email dengan error handling yang lebih detail
+        try {
+            const info = await transporter.sendMail(mailOptions);
+            console.log('Email sent: %s', info.messageId); // Untuk debugging
+            
+            return res.status(200).json({
+                message: "OTP berhasil dikirim ke email",
+                email: email
+            });
+        } catch (emailError) {
+            console.error("Email Error Detail:", emailError);
+            return res.status(500).json({ 
+                message: "Gagal mengirim email OTP",
+                error: emailError.message 
+            });
+        }
+
+    } catch (error) {
+        console.error("Send OTP Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { kode, newPassword } = req.body;
+
+        // Validasi input
+        if (!kode || !newPassword) {
+            return res.status(400).json({
+                message: "Kode OTP dan password baru harus diisi"
+            });
+        }
+
+        // Cari OTP yang valid
+        const otp = await prisma.otp.findFirst({
+            where: {
+                kode: kode,
+                status: false,
+                expiredAt: {
+                    gt: new Date()
+                }
+            },
+            include: {
+                peserta: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        if (!otp) {
+            return res.status(400).json({
+                message: "Kode OTP tidak valid atau sudah kadaluarsa"
+            });
+        }
+
+        // Hash password baru
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+        // Update password user
+        await prisma.peserta.update({
+            where: { id: otp.id_user },
+            data: {
+                password: hashedPassword,
+                updatedAt: new Date()
+            }
+        });
+
+        // Update status OTP
+        await prisma.otp.update({
+            where: { id: otp.id },
+            data: {
+                status: true,
+                updatedAt: new Date()
+            }
+        });
+
+        // Kirim email konfirmasi
+        const mailOptions = {
+            from: EMAIL_USER,
+            to: otp.peserta.email,
+            subject: "Konfirmasi Reset Password Berhasil",
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2>Konfirmasi Reset Password</h2>
+                    <br>
+                    <p>Yth. ${otp.peserta.nama},</p>
+                    <br>
+                    <p>Password akun Anda telah berhasil diubah pada:</p>
+                    <p style="font-weight: bold;">${new Date().toLocaleString('id-ID', { 
+                        timeZone: 'Asia/Jakarta',
+                        dateStyle: 'full', 
+                        timeStyle: 'long' 
+                    })}</p>
+                    <br>
+                    <p>Jika Anda tidak melakukan perubahan password ini, segera hubungi administrator.</p>
+                    <br>
+                    <p style="color: #666;">Untuk keamanan:</p>
+                    <ul style="color: #666;">
+                        <li>Jangan bagikan password Anda kepada siapapun</li>
+                        <li>Gunakan password yang kuat dan unik</li>
+                        <li>Ganti password Anda secara berkala</li>
+                    </ul>
+                    <br>
+                    <p>Hormat kami,</p>
+                    <p>Badan Pusat Statistik Sumatera Barat</p>
+                    <br>
+                    <p style="color: #666; font-size: 12px;">Email ini dikirim secara otomatis, mohon tidak membalas email ini.</p>
+                </div>
+            `
+        };
+
+        try {
+            await transporter.sendMail(mailOptions);
+        } catch (emailError) {
+            console.error("Email Error:", emailError);
+            // Tetap return success meski email gagal terkirim
+            // karena password sudah berhasil diubah
+            return res.status(200).json({
+                message: "Password berhasil diubah, namun email konfirmasi gagal terkirim"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Password berhasil diubah dan email konfirmasi telah dikirim"
+        });
+
+    } catch (error) {
+        console.error("Reset Password Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+
+
+module.exports = { login, logout, refreshAccessToken,sendOTP,resetPassword };

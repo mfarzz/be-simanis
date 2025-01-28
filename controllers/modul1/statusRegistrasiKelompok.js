@@ -277,4 +277,172 @@ const previewDocument = async (req, res) => {
 };
 
 
-module.exports = { rejectKelompok, approveKelompok, getKelompokList,searchKelompok,previewDocument };
+// Fungsi baru untuk download dokumen
+const downloadDocument = async (req, res) => {
+    try {
+        const { filename } = req.params;
+        
+        // Extract document type from filename
+        const isBalasan = filename.includes('surat_balasan');
+        const folderName = isBalasan ? 'suratBalasan' : 'suratPengantar';
+        
+        // Construct path sesuai struktur folder
+        const filePath = path.join(process.cwd(), 'uploads', folderName, filename);
+
+        // Debug log
+        console.log('Downloading file:', filePath);
+
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+            console.log('File not found:', filePath);
+            return res.status(404).json({ 
+                error: 'File not found',
+                path: filePath
+            });
+        }
+
+        // Get file extension
+        const ext = path.extname(filePath).toLowerCase();
+        
+        // Set appropriate content type
+        const contentType = {
+            '.pdf': 'application/pdf',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png'
+        }[ext] || 'application/octet-stream';
+
+        // Set response headers for download
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.on('error', error => {
+            console.error('Error downloading file:', error);
+            res.status(500).json({ error: 'Error downloading file' });
+        });
+
+        fileStream.pipe(res);
+
+    } catch (error) {
+        console.error("Download Document Error:", error);
+        res.status(500).json({ 
+            error: "Internal Server Error",
+            details: error.message 
+        });
+    }
+};
+
+const getAdminNotifications = async (req, res) => {
+    try {
+        const { id: adminId } = req.user; // Ambil ID admin dari token JWT
+
+        const notifications = await prisma.notifikasiPegawai.findMany({
+            where: {
+                id_peserta: adminId
+            },
+            orderBy: {
+                createdAt: 'desc' // Notifikasi terbaru muncul duluan
+            }
+        });
+
+        return res.status(200).json({
+            message: "Notifikasi berhasil diambil",
+            data: notifications
+        });
+
+    } catch (error) {
+        console.error("Get Admin Notifications Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+// Menandai notifikasi sudah dibaca
+const markNotificationAsRead = async (req, res) => {
+    try {
+        const { id: adminId } = req.user; // ID admin dari token
+        const { notificationId } = req.params; // ID notifikasi dari parameter URL
+
+        // Cek apakah notifikasi ada dan milik admin tersebut
+        const notification = await prisma.notifikasiPegawai.findFirst({
+            where: {
+                id: notificationId,
+                id_peserta: adminId
+            }
+        });
+
+        if (!notification) {
+            return res.status(404).json({
+                message: "Notifikasi tidak ditemukan"
+            });
+        }
+
+        // Update status notifikasi menjadi sudah dibaca
+        await prisma.notifikasiPegawai.update({
+            where: {
+                id: notificationId
+            },
+            data: {
+                status: true,
+                updatedAt: new Date()
+            }
+        });
+
+        return res.status(200).json({
+            message: "Notifikasi telah dibaca"
+        });
+
+    } catch (error) {
+        console.error("Mark Notification As Read Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+
+// Menandai semua notifikasi sudah dibaca
+const markAllNotificationsAsRead = async (req, res) => {
+    try {
+        const { id: adminId } = req.user;
+
+        // Update semua notifikasi yang belum dibaca
+        await prisma.notifikasiPegawai.updateMany({
+            where: {
+                id_peserta: adminId,
+                status: false
+            },
+            data: {
+                status: true,
+                updatedAt: new Date()
+            }
+        });
+
+        return res.status(200).json({
+            message: "Semua notifikasi telah dibaca"
+        });
+
+    } catch (error) {
+        console.error("Mark All Notifications As Read Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+
+module.exports = { 
+    rejectKelompok, 
+    approveKelompok, 
+    getKelompokList,
+    searchKelompok,previewDocument,
+    downloadDocument,
+    getAdminNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead };

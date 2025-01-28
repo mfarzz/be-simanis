@@ -13,7 +13,10 @@ const createTugas = async (req, res) => {
         }
 
         const peserta = await prisma.peserta.findUnique({
-            where: { id: pesertaId }
+            where: { id: pesertaId },
+            include: {
+                kelompok: true // Include kelompok untuk mendapatkan info tambahan
+            }
         });
 
         if (!peserta) {
@@ -22,6 +25,7 @@ const createTugas = async (req, res) => {
             });
         }
 
+        // Create tugas
         const tugas = await prisma.tugas.create({
             data: {
                 id_peserta: pesertaId,
@@ -32,10 +36,31 @@ const createTugas = async (req, res) => {
             }
         });
 
+        // Format deadline untuk pesan notifikasi
+        const deadlineFormat = new Date(deadline).toLocaleDateString('id-ID', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Create notifikasi untuk peserta
+        await prisma.notifikasiPeserta.create({
+            data: {
+                id_peserta: pesertaId,
+                tipe: "Tugas",
+                pesan: `Anda mendapat tugas baru: ${deskripsi}. Deadline: ${deadlineFormat}`,
+                status: false, // belum dibaca
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
+        });
+
         return res.status(201).json({
             message: "Tugas berhasil ditambahkan",
             data: tugas
-            
         });
 
     } catch (error) {

@@ -83,6 +83,84 @@ const getStatistikHarian = async (req, res) => {
     }
 };
 
+const getStatistikMingguan = async (req, res) => {
+    try {
+        const now = new Date();
+        const startDate = new Date(now);
+        startDate.setMonth(startDate.getMonth() - 1); // Ambil data 1 bulan terakhir
+
+        // Query untuk mengambil data mentah
+        const rawData = await prisma.peserta.findMany({
+            where: {
+                createdAt: {
+                    gte: startDate
+                }
+            },
+            select: {
+                createdAt: true
+            },
+            orderBy: {
+                createdAt: 'asc'
+            }
+        });
+
+        // Fungsi helper untuk mendapatkan tanggal awal minggu (Senin)
+        const getStartOfWeek = (date) => {
+            const newDate = new Date(date);
+            const day = newDate.getDay();
+            const diff = newDate.getDate() - day + (day === 0 ? -6 : 1);
+            newDate.setDate(diff);
+            // Reset waktu ke 00:00:00
+            newDate.setHours(0, 0, 0, 0);
+            return newDate;
+        };
+
+        // Fungsi helper untuk mendapatkan tanggal akhir minggu (Minggu)
+        const getEndOfWeek = (startDate) => {
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 6);
+            // Set waktu ke 23:59:59
+            endDate.setHours(23, 59, 59, 999);
+            return endDate;
+        };
+
+        // Mengelompokkan data berdasarkan minggu
+        const weeklyData = rawData.reduce((acc, item) => {
+            const date = new Date(item.createdAt);
+            const startOfWeek = getStartOfWeek(date);
+            const endOfWeek = getEndOfWeek(startOfWeek);
+            
+            // Hitung nomor minggu
+            const weekNumber = Math.ceil((((date - new Date(date.getFullYear(), 0, 1)) / 86400000) + 1) / 7);
+            const key = `${date.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+
+            if (!acc[key]) {
+                acc[key] = {
+                    minggu: key,
+                    tanggalMulai: startOfWeek,
+                    tanggalAkhir: endOfWeek,
+                    jumlah: 0
+                };
+            }
+            acc[key].jumlah += 1;
+            return acc;
+        }, {});
+
+        // Convert ke array dan urutkan berdasarkan minggu
+        const result = Object.values(weeklyData).sort((a, b) => 
+            b.minggu.localeCompare(a.minggu)
+        );
+
+        return res.status(200).json({
+            message: "Statistik mingguan berhasil diambil",
+            data: result
+        });
+    } catch (error) {
+        console.error("Error:", error);
+        return res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
  
  // Statistik Bulanan
  const getStatistikBulanan = async (req, res) => {
@@ -138,4 +216,4 @@ const getStatistikHarian = async (req, res) => {
 
 
 
-module.exports = {getUnitKerjaStatistics, getStatistikHarian, getStatistikBulanan, getStatistikTahunan}
+module.exports = {getUnitKerjaStatistics, getStatistikHarian,getStatistikMingguan, getStatistikBulanan, getStatistikTahunan}
