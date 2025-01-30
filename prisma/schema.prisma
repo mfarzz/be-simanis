@@ -112,6 +112,7 @@ model Peserta {
   nomor_peserta     String?           @unique @db.VarChar(255)
   sertifikat        String?           @db.Text
   status_sertifikat StatusSertifikat?
+  sertifikat_preview String?
   status_peserta    StatusPeserta     @default(Aktif)  // kolom baru
   template_sertifikat_id String?           @db.Uuid
   template               TemplateSertifikat? @relation(fields: [template_sertifikat_id], references: [id])

@@ -4,6 +4,8 @@ const {
     transporter,
     EMAIL_USER,
 } = require("../../middlewares/transporter.middleware");
+const path = require('path');
+
 
 
 const uploadTemplate = async (req, res) => {
@@ -224,21 +226,61 @@ const generateSertifikat = async (req, res) => {
             tahun: new Date(peserta.jadwal_selesai).getFullYear()
         });
 
-        const buffer = doc.getZip().generate({type: 'nodebuffer'});
-        const newPath = `uploads/sertifikat/${Date.now()}-sertifikat.docx`;
-        fs.writeFileSync(newPath, buffer);
+        const libre = require('libreoffice-convert');
+const util = require('util');
+const convertAsync = util.promisify(libre.convert);
 
-        // Update data peserta
-        await prisma.peserta.update({
-            where: { id: pesertaId },
-            data: {
-                nomor_peserta,
-                sertifikat: newPath,
-                status_sertifikat: 'Selesai',
-                template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id,
-                status_peserta: 'Nonaktif' // Update status peserta menjadi Nonaktif
-            }
-        });
+const convertToPDF = async (docxPath, pdfPath) => {
+  try {
+    const docxBuffer = await fs.promises.readFile(docxPath);
+    const pdfBuffer = await convertAsync(docxBuffer, '.pdf', undefined);
+    await fs.promises.writeFile(pdfPath, pdfBuffer);
+    return true;
+  } catch (error) {
+    console.error('Error converting to PDF:', error);
+    return false;
+  }
+};
+
+        // Generate docx file
+const buffer = doc.getZip().generate({type: 'nodebuffer'});
+const timestamp = Date.now();
+const docxPath = `uploads/sertifikat/${timestamp}-sertifikat.docx`;
+const pdfPath = `uploads/sertifikat/${timestamp}-sertifikat.pdf`;
+
+// Simpan file docx
+fs.writeFileSync(docxPath, buffer);
+
+try {
+    // Coba konversi ke PDF
+    await convertToPDF(docxPath, pdfPath);
+    
+    // Update data peserta dengan kedua path
+    await prisma.peserta.update({
+        where: { id: pesertaId },
+        data: {
+            nomor_peserta,
+            sertifikat: docxPath,          // Path untuk file DOCX
+            sertifikat_preview: pdfPath,    // Path untuk file PDF
+            status_sertifikat: 'Selesai',
+            template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id,
+            status_peserta: 'Nonaktif'
+        }
+    });
+} catch (conversionError) {
+    console.error('Error converting to PDF:', conversionError);
+    // Jika konversi gagal, tetap simpan docx
+    await prisma.peserta.update({
+        where: { id: pesertaId },
+        data: {
+            nomor_peserta,
+            sertifikat: docxPath,
+            status_sertifikat: 'Selesai',
+            template_sertifikat_id: selectedTemplate.id || peserta.template_sertifikat_id,
+            status_peserta: 'Nonaktif'
+        }
+    });
+}
 
         // Buat notifikasi untuk peserta
         await prisma.notifikasiPeserta.create({
@@ -271,7 +313,7 @@ const generateSertifikat = async (req, res) => {
                             background-color: #f9f9f9;
                         }
                         .header {
-                            background-color: #0066cc;
+                            background-color: #06255c;
                             color: white;
                             padding: 20px;
                             text-align: center;
@@ -286,7 +328,7 @@ const generateSertifikat = async (req, res) => {
                         .info-box {
                             background-color: #f0f7ff;
                             padding: 15px;
-                            border-left: 4px solid #0066cc;
+                            border-left: 4px solid #06255c;
                             margin: 20px 0;
                         }
                         .footer {
@@ -300,7 +342,7 @@ const generateSertifikat = async (req, res) => {
                         .button {
                             display: inline-block;
                             padding: 10px 20px;
-                            background-color: #0066cc;
+                            background-color: #06255c;
                             color: white;
                             text-decoration: none;
                             border-radius: 5px;
@@ -438,6 +480,48 @@ const generateSertifikat = async (req, res) => {
     }
 };
 
+const previewSertif = async (req, res) => {
+    try {
+        const pesertaId = req.user.id;
+
+        const peserta = await prisma.peserta.findUnique({
+            where: { id: pesertaId },
+            select: { sertifikat_preview: true, status_sertifikat: true }
+        });
+
+        if (!peserta) {
+            return res.status(404).json({ error: 'Peserta tidak ditemukan' });
+        }
+
+        if (peserta.status_sertifikat !== 'Selesai') {
+            return res.status(400).json({ message: 'Sertifikat masih dalam proses' });
+        }
+
+        if (!peserta.sertifikat_preview) {
+            return res.status(404).json({ error: 'Sertifikat tidak ditemukan' });
+        }
+
+        const projectRoot = path.resolve(__dirname, '../..');
+        const filePath = path.join(projectRoot, peserta.sertifikat_preview);
+
+        if (fs.existsSync(filePath)) {
+            return res.sendFile(filePath);
+        }
+
+        return res.status(404).json({ 
+            error: 'Sertifikat tidak ditemukan', 
+            details: { storedPath: peserta.sertifikat_preview }
+        });
+
+    } catch (error) {
+        console.error('Error Preview Sertifikat:', error);
+        return res.status(500).json({ 
+            error: 'Gagal menampilkan sertifikat',
+            message: error.message 
+        });
+    }
+};
+
 
 module.exports = {
     uploadTemplate,
@@ -447,5 +531,6 @@ module.exports = {
     deleteTemplate,
     generateSertifikat,
     downloadSertifikat,
-    checkSertifikatStatus
+    checkSertifikatStatus,
+    previewSertif
 };

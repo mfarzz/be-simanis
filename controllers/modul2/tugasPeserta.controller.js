@@ -19,23 +19,26 @@ const getPesertaTugas = async (req, res) => {
                 createdAt: 'desc'
             }
         });
- 
+
+        // Return status 200 even if no tasks are found
         if (tugas.length === 0) {
-            return res.status(404).json({
-                message: "Belum ada tugas"
+            return res.status(200).json({
+                message: "Belum ada tugas",
+                data: []
             });
         }
- 
+
         return res.status(200).json({
             message: "Berhasil mengambil data tugas",
             data: tugas
         });
- 
+
     } catch (error) {
         console.error("Error fetching tugas:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
- };
+};
+
 
 
 
@@ -101,4 +104,68 @@ const getPesertaTugas = async (req, res) => {
     }
 };
 
-module.exports = {tugasSelesai, getPesertaTugas}
+const getPesertaTugasStatistic = async (req, res) => {
+    try {
+        // Get all tasks for the participant
+        const tugas = await prisma.tugas.findMany({
+            where: {
+                id_peserta: req.user.id
+            }
+        });
+
+        if (tugas.length === 0) {
+            return res.status(200).json({
+                message: "Belum ada data statistik tugas",
+                data: {
+                    total_tugas: 0,
+                    status_summary: {},
+                    deadline_summary: {
+                        upcoming: 0,
+                        passed: 0
+                    },
+                    completion_rate: {
+                        total: 0,
+                        completed: 0,
+                        percentage: "0.00"
+                    }
+                }
+            });
+        }
+
+        // Calculate status summary
+        const status_summary = tugas.reduce((acc, task) => {
+            acc[task.status] = (acc[task.status] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Calculate deadline statistics
+        const now = new Date();
+        const deadline_summary = {
+            upcoming: tugas.filter(task => new Date(task.deadline) > now).length,
+            passed: tugas.filter(task => new Date(task.deadline) <= now).length
+        };
+
+        // Calculate completion rate
+        const completion_rate = {
+            total: tugas.length,
+            completed: tugas.filter(task => task.status === 'Selesai').length,
+            percentage: (tugas.filter(task => task.status === 'Selesai').length / tugas.length * 100).toFixed(2)
+        };
+
+        return res.status(200).json({
+            message: "Berhasil mengambil statistik tugas",
+            data: {
+                total_tugas: tugas.length,
+                status_summary,
+                deadline_summary,
+                completion_rate
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching tugas statistics:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+module.exports = {tugasSelesai, getPesertaTugas,getPesertaTugasStatistic}
