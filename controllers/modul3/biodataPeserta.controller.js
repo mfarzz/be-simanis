@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
+const path = require('path');
+const fs = require('fs');
 
 const getBiodata = async (req, res) => {
     if (!req.user?.id) {
@@ -26,6 +28,91 @@ const getBiodata = async (req, res) => {
         console.error(error);
         res.status(500).json({
             error: "Terjadi kesalahan saat mengambil biodata",
+            details: error.message
+        });
+    }
+};
+
+const getFotoPeserta = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "User tidak terautentikasi" });
+    }
+
+    try {
+        // Cari data peserta untuk mendapatkan nama file foto
+        const peserta = await prisma.peserta.findUnique({
+            where: { id: req.user.id },
+            select: { foto: true }
+        });
+
+        if (!peserta || !peserta.foto) {
+            return res.status(404).json({ error: "Foto tidak ditemukan" });
+        }
+
+        // Sesuaikan path dengan struktur folder project Anda
+        // Misalnya jika foto disimpan di folder 'public/uploads/photos'
+        const filePath = path.join(__dirname, '../../uploads/photos', peserta.foto);
+
+        // Verifikasi file exists
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                error: "File foto tidak ditemukan",
+                path: filePath // untuk debugging
+            });
+        }
+
+        // Kirim file sebagai response
+        res.sendFile(filePath);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Terjadi kesalahan saat mengambil foto",
+            details: error.message
+        });
+    }
+};
+
+const getFotoPesertabyAdmin = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const peserta = await prisma.peserta.findUnique({
+            where: { id },
+            select: { foto: true }
+        });
+
+        // Jika peserta tidak ditemukan
+        if (!peserta) {
+            return res.status(404).json({ 
+                error: "Data peserta tidak ditemukan" 
+            });
+        }
+
+        // Jika foto belum diisi, kirim response 200 dengan pesan
+        if (!peserta.foto) {
+            return res.status(200).json({ 
+                message: "Foto profil belum diisi",
+                status: "NO_PHOTO"
+            });
+        }
+
+        const filePath = path.join(__dirname, '../../uploads/photos', peserta.foto);
+        
+        // Cek keberadaan file
+        if (!fs.existsSync(filePath)) {
+            return res.status(200).json({
+                message: "File foto tidak ditemukan di server",
+                status: "FILE_NOT_FOUND"
+            });
+        }
+
+        // Kirim file foto jika semua pengecekan berhasil
+        res.sendFile(filePath);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Terjadi kesalahan saat mengambil foto peserta",
             details: error.message
         });
     }
@@ -159,5 +246,7 @@ const deleteBiodata = async (req, res) => {
 module.exports = {
     addBiodata,
     deleteBiodata,
-    getBiodata
+    getBiodata,
+    getFotoPeserta,
+    getFotoPesertabyAdmin
 };

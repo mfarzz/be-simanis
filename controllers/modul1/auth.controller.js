@@ -34,42 +34,64 @@ const setCookieOptions = (isProduction) => ({
 
 const login = async (req, res) => {
     const { email, password } = req.body;
+
     try {
         if (!email || !password) {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
         let user = null;
+        let role = null;
+
+        // Cari user di tabel peserta
         user = await prisma.peserta.findFirst({ where: { email } });
-        if (!user) {
+        if (user) {
+            role = "Peserta";
+        } else {
+            // Jika tidak ditemukan di peserta, cari di tabel pegawai
             user = await prisma.pegawai.findFirst({ where: { email } });
+            if (user) {
+                // Tentukan role berdasarkan data user
+                if (user.role === 'Admin') {
+                    role = "Admin";
+                } else {
+                    role = "Pegawai";
+                }
+            }
         }
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
+        // Verifikasi password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
+        // Generate token
         const { accessToken, refreshToken } = generateTokens(user);
 
+        // Kirim refreshToken sebagai cookie
         res.cookie(
             "refreshToken",
             refreshToken,
             setCookieOptions(process.env.NODE_ENV)
         );
+
+        // Response dengan accessToken dan role
         res.json({
             message: "Login berhasil",
             accessToken,
+            role, // Sertakan role dalam response
         });
     } catch (error) {
         console.error("Login Error:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
 
 const logout = async (req, res) => {
     try {

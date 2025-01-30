@@ -3,23 +3,47 @@ const prisma = new PrismaClient()
 
 const getUnitKerjaStatistics = async (req, res) => {
     try {
-        // Query untuk menghitung jumlah peserta berdasarkan unit_kerja
+        // Pertama, dapatkan total peserta yang unit_kerja nya null
+        const nullCount = await prisma.peserta.count({
+            where: {
+                unit_kerja: null
+            }
+        });
+
+        // Query untuk menghitung jumlah peserta berdasarkan unit_kerja yang tidak null
         const statistics = await prisma.peserta.groupBy({
             by: ['unit_kerja'],
             _count: {
                 unit_kerja: true,
             },
+            where: {
+                unit_kerja: {
+                    not: null
+                }
+            },
+            orderBy: {
+                unit_kerja: 'asc'
+            }
         });
 
         // Format hasil statistik per unit kerja
-        const formattedStatistics = statistics.map((stat) => ({
-            unitKerja: stat.unit_kerja || 'Tidak Ditentukan', // Jika null
+        let formattedStatistics = statistics.map((stat) => ({
+            unitKerja: stat.unit_kerja,
             count: stat._count.unit_kerja,
         }));
 
-        // Hitung total divisi dan peserta
-        const totalPeserta = statistics.reduce((sum, stat) => sum + stat._count.unit_kerja, 0);
-        const totalDivisi = statistics.length;
+        // Tambahkan data untuk unit kerja yang null
+        formattedStatistics.push({
+            unitKerja: 'Tidak Ditentukan',
+            count: nullCount
+        });
+
+        // Hitung total divisi (termasuk kategori 'Tidak Ditentukan')
+        const totalDivisi = statistics.length + (nullCount > 0 ? 1 : 0);
+
+        // Hitung total peserta (termasuk yang null)
+        const totalPeserta = statistics.reduce((sum, stat) => 
+            sum + stat._count.unit_kerja, 0) + nullCount;
 
         // Gabungkan hasil
         const result = {

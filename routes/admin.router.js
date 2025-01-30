@@ -11,6 +11,7 @@ var {uploadTemplate, getAllTemplates, chooseOneTemplate, deleteTemplate, generat
 
 var { upload } = require('../middlewares/foto.middleware');
 const templates = require('../middlewares/template.middleware');
+const { getFotoPesertabyAdmin } = require('../controllers/modul3/biodataPeserta.controller');
 
 //register
 router.get('/list-kelompok',auth(['Admin']),getKelompokList)
@@ -24,6 +25,7 @@ router.get('/download-surat/:filename', auth(['Admin']), downloadDocument);
 router.get('/list-biodata',auth(['Admin']), getAllBiodata)
 router.put('/add-biodata/:pesertaId',upload,auth(['Admin']),addBiodata)
 router.delete('/delete-biodata/:pesertaId', auth(['Admin']), deleteBiodata);
+router.get('/get-foto-peserta/:id',auth(['Admin']),getFotoPesertabyAdmin)
 
 //tugas
 router.get('/list-tugas', auth(['Admin']), getAllTugas);
