@@ -24,7 +24,7 @@ enum UnitKerja {
   Umum
   IT
   Diseminasi
-  Teknikal
+  Teknis
 }
 
 enum StatusSertifikat {
@@ -74,6 +74,7 @@ model Kelompok {
   surat_pengantar String         @db.Text
   surat_balasan   String?        @db.Text
   status          StatusKelompok @default(Pending)
+  catatan         String?        @db.VarChar(255)
   createdAt       DateTime
   updatedAt       DateTime
 
@@ -81,45 +82,43 @@ model Kelompok {
 }
 
 model Peserta {
-  id                String            @id @default(uuid()) @db.Uuid
-  id_kelompok       String            @db.Uuid
-  email             String            @unique @db.VarChar(255)
-  password          String            @db.VarChar(255)
-  nama              String            @db.VarChar(255)
-  nim               String            @unique @db.VarChar(255)
-  jurusan           String            @db.VarChar(255)
-  role              Role              @default(User)
-  nama_penggilan    String?           @db.VarChar(255)
-  tempat_lahir      String?           @db.VarChar(255)
-  tanggal_lahir     DateTime?
-  anak_ke           Int?
-  jumlah_saudara    Int?
-  ip                Float?
-  nama_ibu          String?           @db.VarChar(255)
-  pekerjaan_ibu     String?           @db.VarChar(255)
-  nama_ayah         String?           @db.VarChar(255)
-  pekerjaan_ayah    String?           @db.VarChar(255)
-  agama             Agama?
-  no_hp             String?           @db.VarChar(255)
-  alamat            String?           @db.VarChar(255)
-  alamat_domisili   String?           @db.VarChar(255)
-  alasan            String?           @db.VarChar(255)
-  jadwal_mulai      DateTime?
-  jadwal_selesai    DateTime?
-  keahlian          String?           @db.VarChar(255)
-  unit_kerja        UnitKerja?
-  foto              String?           @db.Text
-  nomor_peserta     String?           @unique @db.VarChar(255)
-  sertifikat        String?           @db.Text
-  status_sertifikat StatusSertifikat?
-  sertifikat_preview String?
-  status_peserta    StatusPeserta     @default(Aktif)  // kolom baru
-  template_sertifikat_id String?           @db.Uuid
+  id                     String              @id @default(uuid()) @db.Uuid
+  id_kelompok            String              @db.Uuid
+  email                  String              @unique @db.VarChar(255)
+  password               String              @db.VarChar(255)
+  nama                   String              @db.VarChar(255)
+  nim                    String              @unique @db.VarChar(255)
+  jurusan                String              @db.VarChar(255)
+  role                   Role                @default(User)
+  nama_penggilan         String?             @db.VarChar(255)
+  tempat_lahir           String?             @db.VarChar(255)
+  tanggal_lahir          DateTime?
+  anak_ke                Int?
+  jumlah_saudara         Int?
+  ip                     Float?
+  nama_ibu               String?             @db.VarChar(255)
+  pekerjaan_ibu          String?             @db.VarChar(255)
+  nama_ayah              String?             @db.VarChar(255)
+  pekerjaan_ayah         String?             @db.VarChar(255)
+  agama                  Agama?
+  no_hp                  String?             @db.VarChar(255)
+  alamat                 String?             @db.VarChar(255)
+  alamat_domisili        String?             @db.VarChar(255)
+  alasan                 String?             @db.VarChar(255)
+  jadwal_mulai           DateTime?
+  jadwal_selesai         DateTime?
+  keahlian               String?             @db.VarChar(255)
+  unit_kerja             UnitKerja?
+  foto                   String?             @db.Text
+  nomor_peserta          String?             @unique @db.VarChar(255)
+  sertifikat             String?             @db.Text
+  status_sertifikat      StatusSertifikat?
+  sertifikat_preview     String?
+  status_peserta         StatusPeserta       @default(Aktif) // kolom baru
+  template_sertifikat_id String?             @db.Uuid
   template               TemplateSertifikat? @relation(fields: [template_sertifikat_id], references: [id])
-  createdAt         DateTime
-  updatedAt         DateTime
-
- 
+  createdAt              DateTime
+  updatedAt              DateTime
 
   kelompok          Kelompok            @relation(fields: [id_kelompok], references: [id])
   Otp               Otp[]
@@ -129,14 +128,14 @@ model Peserta {
 }
 
 model TemplateSertifikat {
-  id                String   @id @default(uuid()) @db.Uuid
-  nama              String   @db.VarChar(255)
-  file_path         String   @db.Text // Lokasi file template sertifikat
-  status            String   @default("Tidak Digunakan") // Status: Sedang Digunakan, Tidak Digunakan
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  Peserta           Peserta[]
-  
+  id               String    @id @default(uuid()) @db.Uuid
+  nama             String    @db.VarChar(255)
+  file_path        String    @db.Text // Lokasi file template sertifikat
+  status           String    @default("Tidak Digunakan") // Status: Sedang Digunakan, Tidak Digunakan
+  template_preview String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  Peserta          Peserta[]
 }
 
 model Otp {

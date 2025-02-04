@@ -89,10 +89,48 @@ const createPegawai = async (req, res) => {
 const getAllPegawai = async (req, res) => {
     try {
         // Ambil data pegawai dengan sorting berdasarkan createdAt descending (terbaru dulu)
+        // dan tambahkan filter untuk exclude role Admin
         const pegawai = await prisma.pegawai.findMany({
+            where: {
+                role: {
+                    not: 'Admin' // Filter out Admin roles
+                }
+            },
             orderBy: {
                 createdAt: 'desc'
             },
+            select: {
+                id: true,
+                email: true,
+                nama: true,
+                nip: true,
+                jabatan: true,
+                role: true,
+                createdAt: true,
+                updatedAt: true,
+                // Tidak memilih field password untuk keamanan
+            }
+        });
+
+        return res.status(200).json({
+            message: "Data pegawai berhasil diambil",
+            data: pegawai
+        });
+
+    } catch (error) {
+        console.error("Get All Pegawai Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+const getAllAccount = async (req, res) => {
+    try {
+        // Ambil data pegawai dengan sorting berdasarkan createdAt descending (terbaru dulu)
+        // dan tambahkan filter untuk exclude role Admin
+        const pegawai = await prisma.pegawai.findMany({
             select: {
                 id: true,
                 email: true,
@@ -310,6 +348,7 @@ const deletePegawai = async (req, res) => {
 module.exports = {
     createPegawai,
     getAllPegawai,
+    getAllAccount,
     editPegawai,
     deletePegawai
 };
