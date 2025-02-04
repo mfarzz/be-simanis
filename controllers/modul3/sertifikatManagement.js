@@ -5,10 +5,19 @@ const {
     EMAIL_USER,
 } = require("../../middlewares/transporter.middleware");
 const path = require('path');
+const mammoth = require("mammoth");
+const libre = require('libreoffice-convert');
+const fs = require('fs');
+const util = require('util');
 
-
+// Convert fs functions to use promises
+const readFileAsync = util.promisify(fs.readFile);
+const writeFileAsync = util.promisify(fs.writeFile);
+const convertAsync = util.promisify(libre.convert);
 
 const uploadTemplate = async (req, res) => {
+    let previewPath = '';
+    
     try {
         // Validasi apakah file diupload
         if (!req.file) {
@@ -20,23 +29,108 @@ const uploadTemplate = async (req, res) => {
 
         // Tentukan path file yang diupload
         const filePath = req.file.path;
+        
+        // Generate preview path (PDF) - simpan di folder yang sama dengan template
+        previewPath = path.join(
+            'uploads/templates',
+            `preview_${path.basename(req.file.filename, '.docx')}.pdf`
+        );
+
+        // Baca file DOCX
+        const docxFile = await readFileAsync(filePath);
+        
+        try {
+            // Convert DOCX ke PDF
+            const pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
+            
+            // Simpan PDF preview
+            await writeFileAsync(previewPath, pdfBuffer);
+        } catch (conversionError) {
+            console.error('Error converting file:', conversionError);
+            throw new Error('Gagal mengkonversi file ke PDF');
+        }
 
         // Simpan informasi template ke database
         const template = await prisma.templateSertifikat.create({
             data: {
                 nama,
                 file_path: filePath,
-                status: 'Tidak Digunakan',  // Status default
+                template_preview: previewPath,
+                status: 'Tidak Digunakan',
             },
         });
 
         // Mengembalikan response dengan data template yang berhasil diupload
-        res.status(201).json({ message: 'Template berhasil diunggah', template });
+        res.status(201).json({ 
+            message: 'Template berhasil diunggah', 
+            template 
+        });
+        
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Terjadi kesalahan saat mengunggah template' });
+        console.error('Error in uploadTemplate:', error);
+        
+        // Cleanup files jika terjadi error
+        try {
+            if (req.file && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+            if (previewPath && fs.existsSync(previewPath)) {
+                fs.unlinkSync(previewPath);
+            }
+        } catch (cleanupError) {
+            console.error('Error during cleanup:', cleanupError);
+        }
+
+        if (error.message.includes('PDF')) {
+            return res.status(500).json({ 
+                error: 'Gagal membuat preview PDF',
+                details: error.message 
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'Terjadi kesalahan saat mengunggah template'
+        });
     }
 };
+
+
+const previewTemplate = async (req, res) => {
+    try {
+        // Ambil id template dari parameter
+        const { id } = req.params;
+
+        // Cari template berdasarkan id
+        const template = await prisma.templateSertifikat.findUnique({
+            where: {
+                id
+            }
+        });
+
+        // Jika template tidak ditemukan
+        if (!template) {
+            return res.status(404).json({ message: 'Template tidak ditemukan' });
+        }
+
+        // Cek apakah file preview ada
+        if (!template.template_preview || !fs.existsSync(template.template_preview)) {
+            return res.status(404).json({ message: 'File preview tidak ditemukan' });
+        }
+
+        // Set header untuk PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="preview_${template.nama}.pdf"`);
+
+        // Streaming file PDF
+        const fileStream = fs.createReadStream(template.template_preview);
+        fileStream.pipe(res);
+        
+    } catch (error) {
+        console.error('Error in previewTemplate:', error);
+        res.status(500).json({ error: 'Terjadi kesalahan saat menampilkan preview template' });
+    }
+};
+
 
 const editTemplate = async (req, res) => {
     try {
@@ -73,27 +167,98 @@ const editTemplate = async (req, res) => {
  };
 
 
-const getAllTemplates = async (req, res) => {
+ const getAllTemplates = async (req, res) => {
     try {
         const templates = await prisma.templateSertifikat.findMany({
-            orderBy: {
-                createdAt: 'desc'
-            }
+            orderBy: { createdAt: 'desc' }
         });
 
+        const templatesWithURL = templates.map(template => ({
+            ...template,
+            fileUrl: `http://localhost:3000/${template.file_path.replace(/\\/g, "/")}`
+        }));
+
         res.status(200).json({
-            JumlahTemplates: templates.length, // Menambahkan jumlah template
+            JumlahTemplates: templates.length,
             message: 'Berhasil mendapatkan daftar template',
-            templates,
+            templates: templatesWithURL,
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ 
-            error: 'Terjadi kesalahan saat mengambil data template' 
-        });
+        res.status(500).json({ error: 'Terjadi kesalahan saat mengambil data template' });
     }
 };
 
+const getTemplatePreview = async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      if (!id || typeof id !== "string" || id.trim() === "") {
+        return res.status(400).json({ message: "ID template tidak valid" });
+      }
+  
+      // Ambil template terbaru dari database
+      const template = await prisma.templateSertifikat.findFirst({
+        where: { id: id },
+        orderBy: { updatedAt: "desc" }, // Pastikan yang terbaru
+      });
+      
+  
+      if (!template) {
+        return res.status(404).json({ message: "Template tidak ditemukan" });
+      }
+  
+      // Ambil path file terbaru
+      const filePath = path.join(__dirname, "../..", template.file_path);
+  
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File template tidak ditemukan" });
+      }
+  
+      // Baca file terbaru
+      const buffer = fs.readFileSync(filePath);
+  
+      // Konversi DOCX ke HTML dengan pengaturan tambahan
+      const result = await mammoth.convertToHtml({
+        buffer: buffer,
+        options: {
+          styleMap: [
+            "p[style-name='Section Title'] => h1:fresh",
+            "p[style-name='Subsection Title'] => h2:fresh",
+          ],
+          ignoreEmptyParagraphs: true,
+          preserveCustomProperties: true,
+        },
+      });
+  
+      // Tambahkan styling agar tampilan lebih baik
+      const styledHtml = `
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; }
+          h1 { color: #2563eb; }
+          h2 { color: #1e40af; }
+          p { margin-bottom: 1em; }
+        </style>
+        ${result.value}
+      `;
+  
+      res.status(200).json({
+        message: "Preview berhasil diambil",
+        htmlContent: styledHtml,
+        templateId: template.id,
+        templateNama: template.nama,
+        lastUpdated: template.updatedAt, // Tambahkan informasi waktu update terakhir
+        warnings: result.warnings,
+      });
+    } catch (error) {
+      console.error("Error previewing document:", error);
+  
+      res.status(500).json({
+        message: "Gagal menampilkan preview",
+        error: error.message,
+      });
+    }
+  };
 
 const chooseOneTemplate = async (req, res) => {
     try {
@@ -158,7 +323,6 @@ const deleteTemplate = async (req, res) => {
 
 const Docxtemplater = require('docxtemplater');
 const PizZip = require('pizzip');
-const fs = require('fs');
 
 const generateSertifikat = async (req, res) => {
     try {
@@ -175,7 +339,7 @@ const generateSertifikat = async (req, res) => {
 
         if (!peserta.nama_penggilan) {
             return res.status(400).json({
-                error: 'Nama penggilan / biodata lengkap peserta belum diisi. Sertifikat tidak dapat digenerate.'
+                error: 'Biodata lengkap peserta belum diisi. Sertifikat tidak dapat digenerate.'
             });
         }
 
@@ -525,8 +689,10 @@ const previewSertif = async (req, res) => {
 
 module.exports = {
     uploadTemplate,
+    previewTemplate,
     editTemplate,
     getAllTemplates,
+    getTemplatePreview,
     chooseOneTemplate,
     deleteTemplate,
     generateSertifikat,

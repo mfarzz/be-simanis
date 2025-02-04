@@ -168,4 +168,75 @@ const getPesertaTugasStatistic = async (req, res) => {
     }
 };
 
-module.exports = {tugasSelesai, getPesertaTugas,getPesertaTugasStatistic}
+const getPesertaNotifications = async (req, res) => {
+    try {
+        const { id: pesertaId } = req.user; // Ambil ID admin dari token JWT
+
+        const notifications = await prisma.notifikasiPeserta.findMany({
+            where: {
+                id_peserta: pesertaId
+            },
+            orderBy: {
+                createdAt: 'desc' // Notifikasi terbaru muncul duluan
+            }
+        });
+
+        return res.status(200).json({
+            message: "Notifikasi berhasil diambil",
+            data: notifications
+        });
+
+    } catch (error) {
+        console.error("Get Admin Notifications Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+
+const markNotificationAsRead = async (req, res) => {
+    try {
+        const { id: pesertaId } = req.user; // ID admin dari token
+        const { notificationId } = req.params; // ID notifikasi dari parameter URL
+
+        // Cek apakah notifikasi ada dan milik admin tersebut
+        const notification = await prisma.notifikasiPeserta.findFirst({
+            where: {
+                id: notificationId,
+                id_peserta: pesertaId
+            }
+        });
+
+        if (!notification) {
+            return res.status(404).json({
+                message: "Notifikasi tidak ditemukan"
+            });
+        }
+
+        // Update status notifikasi menjadi sudah dibaca
+        await prisma.notifikasiPeserta.update({
+            where: {
+                id: notificationId
+            },
+            data: {
+                status: true,
+                updatedAt: new Date()
+            }
+        });
+
+        return res.status(200).json({
+            message: "Notifikasi telah dibaca"
+        });
+
+    } catch (error) {
+        console.error("Mark Notification As Read Error:", error);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+};
+
+module.exports = {tugasSelesai, getPesertaTugas,getPesertaTugasStatistic, getPesertaNotifications, markNotificationAsRead}

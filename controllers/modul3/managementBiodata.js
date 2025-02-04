@@ -3,19 +3,54 @@ const prisma = new PrismaClient()
 
 const getAllBiodata = async (req, res) => {
     try {
-        // Ambil semua biodata peserta beserta riwayat pendidikannya
+        const { status_peserta, unit_kerja, sortBy = 'asc' } = req.query; 
+        
+        // Menyiapkan filter berdasarkan status_peserta dan unit_kerja
+        let whereClause = {};
+        if (status_peserta) {
+            whereClause.status_peserta = status_peserta;
+        }
+        if (unit_kerja) {
+            if (unit_kerja === "Tidak Ditentukan") {
+                whereClause.unit_kerja = null;
+            } else if (unit_kerja !== "") {
+                whereClause.unit_kerja = unit_kerja;
+            }
+        }
+
+        // Menyiapkan orderBy untuk sorting
+        let orderBy = {};
+        if (sortBy) {
+            orderBy.status_peserta = sortBy.toLowerCase();
+        }
+
+        // Ambil biodata peserta dengan filter dan sorting
         const biodatas = await prisma.peserta.findMany({
+            where: whereClause,
+            orderBy: orderBy,
             include: {
                 RiwayatPendidikan: true
             }
         });
 
-        // Hitung jumlah total peserta
-        const totalPeserta = await prisma.peserta.count();
+        // Hitung total peserta berdasarkan filter
+        const totalPeserta = await prisma.peserta.count({
+            where: whereClause
+        });
+
+        // Hitung jumlah peserta per divisi dan status
+        const divisiStats = await prisma.peserta.groupBy({
+            by: ['unit_kerja', 'status_peserta'],
+            _count: {
+                id: true
+            },
+            where: whereClause
+        });
 
         res.status(200).json({
-            total: totalPeserta,  // Menyertakan jumlah total peserta
-            biodatas: biodatas    // Menyertakan data biodata peserta
+            total: totalPeserta,
+            biodatas: biodatas,
+            divisiStats: divisiStats
         });
     } catch (error) {
         res.status(500).json({
@@ -24,7 +59,6 @@ const getAllBiodata = async (req, res) => {
         });
     }
 };
-
 
 const addBiodata = async (req, res) => {
     const { pesertaId } = req.params;

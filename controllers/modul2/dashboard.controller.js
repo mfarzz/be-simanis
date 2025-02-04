@@ -3,14 +3,32 @@ const prisma = new PrismaClient()
 
 const getUnitKerjaStatistics = async (req, res) => {
     try {
-        // Pertama, dapatkan total peserta yang unit_kerja nya null
-        const nullCount = await prisma.peserta.count({
-            where: {
-                unit_kerja: null
+        // Hitung jumlah peserta berdasarkan status
+        const statusStats = await prisma.peserta.groupBy({
+            by: ['status_peserta'],
+            _count: {
+                id: true
             }
         });
 
-        // Query untuk menghitung jumlah peserta berdasarkan unit_kerja yang tidak null
+        // Format status peserta statistics
+        const peserta_summary = statusStats.reduce((acc, stat) => {
+            acc[stat.status_peserta] = stat._count.id;
+            return acc;
+        }, {
+            Aktif: 0,
+            Nonaktif: 0
+        });
+
+        // Pertama, dapatkan total peserta AKTIF yang unit_kerja nya null
+        const nullCount = await prisma.peserta.count({
+            where: {
+                unit_kerja: null,
+                status_peserta: 'Aktif'  // Tambahkan filter status aktif
+            }
+        });
+
+        // Query untuk menghitung jumlah peserta AKTIF berdasarkan unit_kerja yang tidak null
         const statistics = await prisma.peserta.groupBy({
             by: ['unit_kerja'],
             _count: {
@@ -19,7 +37,8 @@ const getUnitKerjaStatistics = async (req, res) => {
             where: {
                 unit_kerja: {
                     not: null
-                }
+                },
+                status_peserta: 'Aktif'  // Tambahkan filter status aktif
             },
             orderBy: {
                 unit_kerja: 'asc'
@@ -32,16 +51,18 @@ const getUnitKerjaStatistics = async (req, res) => {
             count: stat._count.unit_kerja,
         }));
 
-        // Tambahkan data untuk unit kerja yang null
-        formattedStatistics.push({
-            unitKerja: 'Tidak Ditentukan',
-            count: nullCount
-        });
+        // Tambahkan data untuk unit kerja yang null (hanya yang aktif)
+        if (nullCount > 0) {
+            formattedStatistics.push({
+                unitKerja: 'Tidak Ditentukan',
+                count: nullCount
+            });
+        }
 
-        // Hitung total divisi (termasuk kategori 'Tidak Ditentukan')
-        const totalDivisi = statistics.length + (nullCount > 0 ? 1 : 0);
+        // Hitung total divisi (TIDAK termasuk kategori 'Tidak Ditentukan')
+        const totalDivisi = statistics.length;
 
-        // Hitung total peserta (termasuk yang null)
+        // Hitung total peserta aktif (termasuk yang null)
         const totalPeserta = statistics.reduce((sum, stat) => 
             sum + stat._count.unit_kerja, 0) + nullCount;
 
@@ -50,6 +71,9 @@ const getUnitKerjaStatistics = async (req, res) => {
             statistics: formattedStatistics,
             totalDivisi,
             totalPeserta,
+            peserta_summary,
+            peserta_aktif: peserta_summary.Aktif || 0,
+            peserta_nonaktif: peserta_summary.Nonaktif || 0
         };
 
         res.status(200).json({
