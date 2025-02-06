@@ -272,6 +272,15 @@ const createTugas = async (req, res) => {
 
  const getAllTugas = async (req, res) => {
     try {
+        const { sortBy = 'createdAt', sortOrder = 'asc' } = req.query;
+
+        // Validasi sortOrder
+        const order = sortOrder.toLowerCase() === 'desc' ? 'desc' : 'asc';
+
+        // Daftar kolom yang bisa di-sort
+        const validSortColumns = ['createdAt', 'deadline', 'status'];
+        const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'createdAt';
+
         const tugas = await prisma.tugas.findMany({
             include: {
                 peserta: {
@@ -285,25 +294,27 @@ const createTugas = async (req, res) => {
                         nama: true
                     }
                 }
+            },
+            orderBy: {
+                [sortColumn]: order
             }
         });
- 
+
         if (tugas.length === 0) {
             return res.status(404).json({
                 message: "Belum ada tugas yang ditambahkan"
             });
         }
- 
+
         return res.status(200).json({
             message: "Data tugas berhasil diambil",
             data: tugas
         });
- 
+
     } catch (error) {
         console.error("Error fetching tugas:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
- };
-
+};
 
 module.exports ={ createTugas, editTugas, deleteTugas, getAllTugas}

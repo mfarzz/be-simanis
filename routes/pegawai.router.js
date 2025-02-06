@@ -4,6 +4,15 @@ var { auth } = require('../middlewares/auth.middleware');
 var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 var {getAllBiodata} = require('../controllers/modul3/managementBiodata');
 const { getPegawaiNotifications } = require('../controllers/modul1/statusRegistrasiKelompok');
+const { getFotoPegawai, getProfile, addProfilePhotobyPegawai } = require('../controllers/modul3/biodataPeserta.controller');
+const { upload } = require('../middlewares/foto.middleware');
+
+
+//profile
+router.put('/update-photo', upload, auth(['Pegawai']), addProfilePhotobyPegawai);
+router.get('/get-foto-pegawai', auth(['Pegawai']), getFotoPegawai);
+router.get('/profile', auth(['Pegawai']), getProfile);
+
 
 
 //tugas

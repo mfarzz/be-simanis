@@ -33,6 +33,42 @@ const getBiodata = async (req, res) => {
     }
 };
 
+const getMyProfile = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "Peserta tidak terautentikasi" });
+    }
+ 
+    try {
+        const profile = await prisma.peserta.findUnique({
+            where: { id: req.user.id },
+            include: {
+                kelompok: {
+                    select: {
+                        instansi: true
+                    }
+                }
+            }
+        });
+ 
+        if (!profile) {
+            return res.status(404).json({ error: "Profile tidak ditemukan" });
+        }
+ 
+        res.status(200).json({
+            message: "Berhasil mendapatkan profile",
+            data: profile
+        });
+ 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Gagal mendapatkan profile", 
+            details: error.message
+        });
+    }
+ };
+
+
 const getFotoPeserta = async (req, res) => {
     if (!req.user?.id) {
         return res.status(400).json({ error: "User tidak terautentikasi" });
@@ -72,6 +108,42 @@ const getFotoPeserta = async (req, res) => {
         });
     }
 };
+
+
+const getFotoPegawai = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "Pegawai tidak terautentikasi" });
+    }
+ 
+    try {
+        const pegawai = await prisma.pegawai.findUnique({
+            where: { id: req.user.id },
+            select: { foto: true }
+        });
+ 
+        if (!pegawai || !pegawai.foto) {
+            return res.status(404).json({ error: "Foto tidak ditemukan" });
+        }
+ 
+        const filePath = path.join(__dirname, '../../uploads/photos', pegawai.foto);
+ 
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                error: "File foto tidak ditemukan",
+                path: filePath
+            });
+        }
+ 
+        res.sendFile(filePath);
+ 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Terjadi kesalahan saat mengambil foto",
+            details: error.message
+        });
+    }
+ };
 
 const getFotoPesertabyAdmin = async (req, res) => {
     const { id } = req.params;
@@ -113,6 +185,99 @@ const getFotoPesertabyAdmin = async (req, res) => {
         console.error(error);
         res.status(500).json({
             error: "Terjadi kesalahan saat mengambil foto peserta",
+            details: error.message
+        });
+    }
+};
+
+const getProfile = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "Pegawai tidak terautentikasi" });
+    }
+ 
+    try {
+        const profile = await prisma.pegawai.findUnique({
+            where: { id: req.user.id },
+            select: {
+                id: true,
+                nama: true,
+                email: true,
+                nip: true,
+                jabatan: true,
+                role: true,
+                foto: true
+            }
+        });
+ 
+        if (!profile) {
+            return res.status(404).json({ error: "Profile tidak ditemukan" });
+        }
+ 
+        res.status(200).json({
+            message: "Berhasil mendapatkan profile",
+            data: profile
+        });
+ 
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Gagal mendapatkan profile",
+            details: error.message
+        });
+    }
+ };
+
+
+ const addProfilePhotobyPeserta = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "Pegawai tidak terautentikasi" });
+    }
+
+    try {
+        await prisma.peserta.update({
+            where: { id: req.user.id },
+            data: {
+                foto: req.file ? req.file.filename : undefined,
+                updatedAt: new Date()
+            }
+        });
+
+        res.status(200).json({
+            message: "Foto berhasil diupdate",
+            foto: req.file ? req.file.filename : null
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Gagal mengupload foto",
+            details: error.message
+        });
+    }
+};
+
+
+const addProfilePhotobyPegawai = async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(400).json({ error: "Pegawai tidak terautentikasi" });
+    }
+
+    try {
+        await prisma.pegawai.update({
+            where: { id: req.user.id },
+            data: {
+                foto: req.file ? req.file.filename : undefined,
+                updatedAt: new Date()
+            }
+        });
+
+        res.status(200).json({
+            message: "Foto berhasil diupdate",
+            foto: req.file ? req.file.filename : null
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Gagal mengupload foto",
             details: error.message
         });
     }
@@ -247,6 +412,11 @@ module.exports = {
     addBiodata,
     deleteBiodata,
     getBiodata,
+    getMyProfile,
     getFotoPeserta,
-    getFotoPesertabyAdmin
+    getProfile,
+    getFotoPegawai,
+    getFotoPesertabyAdmin,
+    addProfilePhotobyPeserta,
+    addProfilePhotobyPegawai
 };

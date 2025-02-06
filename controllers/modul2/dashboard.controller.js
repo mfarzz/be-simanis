@@ -3,11 +3,30 @@ const prisma = new PrismaClient()
 
 const getUnitKerjaStatistics = async (req, res) => {
     try {
-        // Hitung jumlah peserta berdasarkan status
+        // Get year from query parameter, default to current year if not provided
+        const targetYear = parseInt(req.query.year) || new Date().getFullYear();
+
+        // Hitung total peserta (Aktif + Nonaktif) untuk tahun tertentu
+        const totalPesertaTahunIni = await prisma.peserta.count({
+            where: {
+                createdAt: {
+                    gte: new Date(`${targetYear}-01-01`),
+                    lte: new Date(`${targetYear}-12-31`)
+                }
+            }
+        });
+
+        // Hitung jumlah peserta berdasarkan status untuk tahun tertentu
         const statusStats = await prisma.peserta.groupBy({
             by: ['status_peserta'],
             _count: {
                 id: true
+            },
+            where: {
+                createdAt: {
+                    gte: new Date(`${targetYear}-01-01`),
+                    lte: new Date(`${targetYear}-12-31`)
+                }
             }
         });
 
@@ -20,11 +39,15 @@ const getUnitKerjaStatistics = async (req, res) => {
             Nonaktif: 0
         });
 
-        // Pertama, dapatkan total peserta AKTIF yang unit_kerja nya null
+        // Pertama, dapatkan total peserta AKTIF yang unit_kerja nya null untuk tahun tertentu
         const nullCount = await prisma.peserta.count({
             where: {
                 unit_kerja: null,
-                status_peserta: 'Aktif'  // Tambahkan filter status aktif
+                status_peserta: 'Aktif',
+                createdAt: {
+                    gte: new Date(`${targetYear}-01-01`),
+                    lte: new Date(`${targetYear}-12-31`)
+                }
             }
         });
 
@@ -38,12 +61,28 @@ const getUnitKerjaStatistics = async (req, res) => {
                 unit_kerja: {
                     not: null
                 },
-                status_peserta: 'Aktif'  // Tambahkan filter status aktif
+                status_peserta: 'Aktif',
+                createdAt: {
+                    gte: new Date(`${targetYear}-01-01`),
+                    lte: new Date(`${targetYear}-12-31`)
+                }
             },
             orderBy: {
                 unit_kerja: 'asc'
             }
         });
+
+        // Get yearly registration statistics using raw SQL
+        const yearlyStats = await prisma.$queryRaw`
+            SELECT 
+                EXTRACT(YEAR FROM "createdAt") as year,
+                COUNT(*) as total,
+                COUNT(CASE WHEN status_peserta = 'Aktif' THEN 1 END) as aktif_count,
+                COUNT(CASE WHEN status_peserta = 'Nonaktif' THEN 1 END) as nonaktif_count
+            FROM "Peserta"
+            GROUP BY EXTRACT(YEAR FROM "createdAt")
+            ORDER BY year DESC
+        `;
 
         // Format hasil statistik per unit kerja
         let formattedStatistics = statistics.map((stat) => ({
@@ -62,22 +101,28 @@ const getUnitKerjaStatistics = async (req, res) => {
         // Hitung total divisi (TIDAK termasuk kategori 'Tidak Ditentukan')
         const totalDivisi = statistics.length;
 
-        // Hitung total peserta aktif (termasuk yang null)
-        const totalPeserta = statistics.reduce((sum, stat) => 
-            sum + stat._count.unit_kerja, 0) + nullCount;
+        // Format yearly statistics dengan detail status
+        const yearlyRegistrations = yearlyStats.map(stat => ({
+            year: Number(stat.year),
+            total: Number(stat.total),
+            aktif: Number(stat.aktif_count),
+            nonaktif: Number(stat.nonaktif_count)
+        }));
 
         // Gabungkan hasil
         const result = {
             statistics: formattedStatistics,
             totalDivisi,
-            totalPeserta,
+            totalPesertaTahunIni,
+            yearlyRegistrations,
             peserta_summary,
             peserta_aktif: peserta_summary.Aktif || 0,
-            peserta_nonaktif: peserta_summary.Nonaktif || 0
+            peserta_nonaktif: peserta_summary.Nonaktif || 0,
+            targetYear
         };
 
         res.status(200).json({
-            message: "Statistik unit kerja dan total divisi berhasil diambil",
+            message: `Statistik unit kerja dan total divisi untuk tahun ${targetYear} berhasil diambil`,
             data: result,
         });
     } catch (error) {

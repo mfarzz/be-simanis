@@ -40,6 +40,7 @@ enum TipeNotifikasiPeserta {
 enum TipeNotifikasiPegawai {
   Tugas
   Kelompok
+  Logbook
 }
 
 enum RolePegawai {
@@ -125,6 +126,7 @@ model Peserta {
   RiwayatPendidikan RiwayatPendidikan[]
   Tugas             Tugas[]
   NotifikasiPeserta NotifikasiPeserta[]
+  Logbook           Logbook[]
 }
 
 model TemplateSertifikat {
@@ -163,13 +165,15 @@ model RiwayatPendidikan {
 }
 
 model Pegawai {
-  id                String              @id @default(uuid()) @db.Uuid
-  email             String              @unique @db.VarChar(255)
-  password          String              @db.VarChar(255)
-  nama              String              @db.VarChar(255)
-  nip               String              @db.VarChar(255)
-  jabatan           String              @db.VarChar(255)
-  role              RolePegawai
+  id       String      @id @default(uuid()) @db.Uuid
+  email    String      @unique @db.VarChar(255)
+  password String      @db.VarChar(255)
+  nama     String      @db.VarChar(255)
+  nip      String      @db.VarChar(255)
+  jabatan  String      @db.VarChar(255)
+  role     RolePegawai
+  foto     String?     @db.Text
+
   createdAt         DateTime
   updatedAt         DateTime
   Tugas             Tugas[]
@@ -188,6 +192,17 @@ model Tugas {
   updatedAt  DateTime    @updatedAt @db.Timestamptz
   peserta    Peserta     @relation(fields: [id_peserta], references: [id])
   pegawai    Pegawai     @relation(fields: [id_pegawai], references: [id])
+}
+
+model Logbook {
+  id         String   @id @default(uuid()) @db.Uuid
+  id_peserta String   @db.Uuid
+  tanggal    DateTime @db.Date
+  kegiatan   String   @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  peserta Peserta @relation(fields: [id_peserta], references: [id])
 }
 
 model NotifikasiPeserta {
