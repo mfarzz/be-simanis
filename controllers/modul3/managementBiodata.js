@@ -60,6 +60,56 @@ const getAllBiodata = async (req, res) => {
     }
 };
 
+
+
+const deletePeserta = async (req, res) => {
+    const { pesertaId } = req.params;
+ 
+    try {
+        await prisma.$transaction(async (prisma) => {
+            // 1. Delete Otp records
+            await prisma.otp.deleteMany({
+                where: { id_user: pesertaId }
+            });
+
+            // 2. Delete RiwayatPendidikan records
+            await prisma.riwayatPendidikan.deleteMany({
+                where: { id_peserta: pesertaId }
+            });
+
+            // 3. Delete Tugas records
+            await prisma.tugas.deleteMany({
+                where: { id_peserta: pesertaId }
+            });
+
+            // 4. Delete NotifikasiPeserta records
+            await prisma.notifikasiPeserta.deleteMany({
+                where: { id_peserta: pesertaId }
+            });
+
+            // 5. Delete Logbook records
+            await prisma.logbook.deleteMany({
+                where: { id_peserta: pesertaId }
+            });
+
+            // Finally, delete the peserta record
+            await prisma.peserta.delete({
+                where: { id: pesertaId }
+            });
+        });
+ 
+        res.status(200).json({ 
+            message: "Peserta dan semua data terkait berhasil dihapus"
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            error: "Gagal menghapus peserta",
+            details: error.message
+        });
+    }
+};
+
 const addBiodata = async (req, res) => {
     const { pesertaId } = req.params;
     const {
@@ -183,6 +233,7 @@ const deleteBiodata = async (req, res) => {
  
  module.exports = {
     getAllBiodata,
+    deletePeserta,
     addBiodata,
     deleteBiodata
  };

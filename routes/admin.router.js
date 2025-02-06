@@ -4,14 +4,21 @@ var { auth } = require('../middlewares/auth.middleware');
 var { approveKelompok, rejectKelompok, getKelompokList, searchKelompok, previewDocument,downloadDocument, getAdminNotifications, markNotificationAsRead, markAllNotificationsAsRead } = require('../controllers/modul1/statusRegistrasiKelompok');
 var {createPegawai, getAllPegawai, editPegawai, deletePegawai, getAllAccount} = require('../controllers/modul1/pengelolaanAkun.controller')
 
-const { getAllBiodata, addBiodata,deleteBiodata } = require('../controllers/modul3/managementBiodata');
+const { getAllBiodata, addBiodata,deleteBiodata, deletePeserta } = require('../controllers/modul3/managementBiodata');
 var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 var {getUnitKerjaStatistics, getStatistikHarian,getStatistikBulanan,getStatistikTahunan, getStatistikMingguan} = require('../controllers/modul2/dashboard.controller')
 var {uploadTemplate, getAllTemplates, chooseOneTemplate, deleteTemplate, generateSertifikat, downloadSertifikat, editTemplate, getTemplatePreview, previewTemplate} = require('../controllers/modul3/sertifikatManagement')
 
 var { upload } = require('../middlewares/foto.middleware');
 const templates = require('../middlewares/template.middleware');
-const { getFotoPesertabyAdmin } = require('../controllers/modul3/biodataPeserta.controller');
+const { getFotoPesertabyAdmin, getFotoPegawai, getProfile, addProfilePhotobyPegawai } = require('../controllers/modul3/biodataPeserta.controller');
+const { getAllLogbooks } = require('../controllers/modulTambahan/monitoringLogbook.controller');
+
+
+//Profile
+router.put('/update-photo', upload, auth(['Admin']), addProfilePhotobyPegawai);
+router.get('/get-foto-pegawai', auth(['Admin']), getFotoPegawai);
+router.get('/profile', auth(['Admin']), getProfile);
 
 //register
 router.get('/list-kelompok',auth(['Admin']),getKelompokList)
@@ -22,7 +29,8 @@ router.get('/preview-surat/:filename', auth(['Admin']), previewDocument);
 router.get('/download-surat/:filename', auth(['Admin']), downloadDocument);
 
 //biodata
-router.get('/list-biodata',auth(['Admin']), getAllBiodata)
+router.get('/list-biodata',auth(['Admin']), getAllBiodata);
+router.delete('/delete-peserta/:pesertaId', auth(['Admin']), deletePeserta);
 router.put('/add-biodata/:pesertaId',upload,auth(['Admin']),addBiodata)
 router.delete('/delete-biodata/:pesertaId', auth(['Admin']), deleteBiodata);
 router.get('/get-foto-peserta/:id',auth(['Admin']),getFotoPesertabyAdmin)
@@ -65,6 +73,9 @@ router.put('/mark-all/read-all', auth(['Admin']), markAllNotificationsAsRead);
 
 
 //done sampai notif, akun dan juga perbaikan di sertif buat ngirim ke email
+
+//logbooks
+router.get('/all-logbooks', auth(['Admin']), getAllLogbooks);
 
 
 

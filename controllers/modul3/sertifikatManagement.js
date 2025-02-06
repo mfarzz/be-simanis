@@ -657,12 +657,12 @@ const previewSertif = async (req, res) => {
             return res.status(404).json({ error: 'Peserta tidak ditemukan' });
         }
 
-        if (peserta.status_sertifikat !== 'Selesai') {
-            return res.status(400).json({ message: 'Sertifikat masih dalam proses' });
-        }
-
-        if (!peserta.sertifikat_preview) {
-            return res.status(404).json({ error: 'Sertifikat tidak ditemukan' });
+        // Jika status sertifikat belum selesai atau belum ada sertifikat
+        if (peserta.status_sertifikat !== 'Selesai' || !peserta.sertifikat_preview) {
+            return res.status(200).json({ 
+                message: 'Sertifikat belum tersedia',
+                status: 'Pending'
+            });
         }
 
         const projectRoot = path.resolve(__dirname, '../..');
@@ -672,8 +672,9 @@ const previewSertif = async (req, res) => {
             return res.sendFile(filePath);
         }
 
-        return res.status(404).json({ 
-            error: 'Sertifikat tidak ditemukan', 
+        return res.status(200).json({ 
+            message: 'Sertifikat belum tersedia',
+            status: 'Pending',
             details: { storedPath: peserta.sertifikat_preview }
         });
 
