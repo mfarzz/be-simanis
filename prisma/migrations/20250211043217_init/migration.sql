@@ -5,7 +5,7 @@ CREATE TYPE "Role" AS ENUM ('User');
 CREATE TYPE "Agama" AS ENUM ('Islam', 'Kristen_Protestan', 'Budha', 'Konghucu', 'Hindu', 'Katolik');
 
 -- CreateEnum
-CREATE TYPE "UnitKerja" AS ENUM ('Umum', 'IT', 'Diseminasi', 'Teknikal');
+CREATE TYPE "UnitKerja" AS ENUM ('Umum', 'IT', 'Diseminasi', 'Teknis');
 
 -- CreateEnum
 CREATE TYPE "StatusSertifikat" AS ENUM ('Pending', 'Selesai');
@@ -14,7 +14,7 @@ CREATE TYPE "StatusSertifikat" AS ENUM ('Pending', 'Selesai');
 CREATE TYPE "TipeNotifikasiPeserta" AS ENUM ('Tugas', 'Sertifikat');
 
 -- CreateEnum
-CREATE TYPE "TipeNotifikasiPegawai" AS ENUM ('Tugas', 'Kelompok');
+CREATE TYPE "TipeNotifikasiPegawai" AS ENUM ('Tugas', 'Kelompok', 'Logbook');
 
 -- CreateEnum
 CREATE TYPE "RolePegawai" AS ENUM ('Admin', 'Pegawai');
@@ -24,6 +24,9 @@ CREATE TYPE "StatusKelompok" AS ENUM ('Pending', 'Ditolak', 'Diterima');
 
 -- CreateEnum
 CREATE TYPE "StatusTugas" AS ENUM ('Pending', 'Selesai', 'Terlambat');
+
+-- CreateEnum
+CREATE TYPE "StatusPeserta" AS ENUM ('Aktif', 'Nonaktif');
 
 -- CreateTable
 CREATE TABLE "Kelompok" (
@@ -36,6 +39,7 @@ CREATE TABLE "Kelompok" (
     "surat_pengantar" TEXT NOT NULL,
     "surat_balasan" TEXT,
     "status" "StatusKelompok" NOT NULL DEFAULT 'Pending',
+    "catatan" VARCHAR(255),
     "createdAt" TIMESTAMP(3) NOT NULL,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -72,13 +76,29 @@ CREATE TABLE "Peserta" (
     "keahlian" VARCHAR(255),
     "unit_kerja" "UnitKerja",
     "foto" TEXT,
-    "nomor_peserta" VARCHAR(255) NOT NULL,
+    "nomor_peserta" VARCHAR(255),
     "sertifikat" TEXT,
     "status_sertifikat" "StatusSertifikat",
+    "sertifikat_preview" TEXT,
+    "status_peserta" "StatusPeserta" NOT NULL DEFAULT 'Aktif',
+    "template_sertifikat_id" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Peserta_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateSertifikat" (
+    "id" UUID NOT NULL,
+    "nama" VARCHAR(255) NOT NULL,
+    "file_path" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'Tidak Digunakan',
+    "template_preview" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TemplateSertifikat_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -116,6 +136,7 @@ CREATE TABLE "Pegawai" (
     "nip" VARCHAR(255) NOT NULL,
     "jabatan" VARCHAR(255) NOT NULL,
     "role" "RolePegawai" NOT NULL,
+    "foto" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -128,12 +149,25 @@ CREATE TABLE "Tugas" (
     "id_peserta" UUID NOT NULL,
     "id_pegawai" UUID NOT NULL,
     "deskripsi" VARCHAR(255) NOT NULL,
+    "catatan" VARCHAR(255),
     "status" "StatusTugas" NOT NULL,
     "deadline" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ NOT NULL,
 
     CONSTRAINT "Tugas_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Logbook" (
+    "id" UUID NOT NULL,
+    "id_peserta" UUID NOT NULL,
+    "tanggal" DATE NOT NULL,
+    "kegiatan" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Logbook_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -181,6 +215,9 @@ CREATE UNIQUE INDEX "Otp_kode_key" ON "Otp"("kode");
 CREATE UNIQUE INDEX "Pegawai_email_key" ON "Pegawai"("email");
 
 -- AddForeignKey
+ALTER TABLE "Peserta" ADD CONSTRAINT "Peserta_template_sertifikat_id_fkey" FOREIGN KEY ("template_sertifikat_id") REFERENCES "TemplateSertifikat"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Peserta" ADD CONSTRAINT "Peserta_id_kelompok_fkey" FOREIGN KEY ("id_kelompok") REFERENCES "Kelompok"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -196,31 +233,10 @@ ALTER TABLE "Tugas" ADD CONSTRAINT "Tugas_id_peserta_fkey" FOREIGN KEY ("id_pese
 ALTER TABLE "Tugas" ADD CONSTRAINT "Tugas_id_pegawai_fkey" FOREIGN KEY ("id_pegawai") REFERENCES "Pegawai"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Logbook" ADD CONSTRAINT "Logbook_id_peserta_fkey" FOREIGN KEY ("id_peserta") REFERENCES "Peserta"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "NotifikasiPeserta" ADD CONSTRAINT "NotifikasiPeserta_id_peserta_fkey" FOREIGN KEY ("id_peserta") REFERENCES "Peserta"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "NotifikasiPegawai" ADD CONSTRAINT "NotifikasiPegawai_id_peserta_fkey" FOREIGN KEY ("id_peserta") REFERENCES "Pegawai"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE "Tugas" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "Tugas" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "Peserta" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "Peserta" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "Pegawai" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "Pegawai" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "Kelompok" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "Kelompok" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "Otp" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "Otp" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "RiwayatPendidikan" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "RiwayatPendidikan" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "NotifikasiPeserta" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "NotifikasiPeserta" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-
-ALTER TABLE "NotifikasiPegawai" ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE "NotifikasiPegawai" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;

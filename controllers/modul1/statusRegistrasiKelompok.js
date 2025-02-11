@@ -22,25 +22,19 @@ const getKelompokList = async (req, res) => {
         surat_pengantar: true,
       },
     });
-
-    // Jika tidak ada kelompok yang terdaftar
-    if (kelompokList.length === 0) {
-      return res.status(404).json({
-        message: "Belum ada kelompok yang mendaftar",
-        total_kelompok: 0,
-      });
-    }
-
-    // Kirim data kelompok dan total kelompok sebagai respons
+ 
+    // Kirim data kelompok dan total kelompok sebagai respons dengan status 200
     return res.status(200).json({
+      message: kelompokList.length === 0 ? "Belum ada kelompok yang mendaftar" : "Data kelompok berhasil diambil",
       total_kelompok: kelompokList.length,
-      kelompok: kelompokList,
+      kelompok: kelompokList
     });
+ 
   } catch (error) {
     console.error("Error fetching kelompok list:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
-};
+ };
 
 const rejectKelompok = async (req, res) => {
   const { id } = req.params;

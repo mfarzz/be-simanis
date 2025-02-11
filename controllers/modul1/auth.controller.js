@@ -241,6 +241,7 @@ const sendOTP = async (req, res) => {
     }
 };
 
+
 const resetPassword = async (req, res) => {
     try {
         const { kode, newPassword } = req.body;
@@ -356,6 +357,61 @@ const resetPassword = async (req, res) => {
     }
 };
 
+const getPublicAnalytics = async (req, res) => {
+    try {
+      // Get all analytics in parallel for better performance
+      const [uniqueInstitutions, totalParticipants, departmentStats] = await Promise.all([
+        // Count unique institutions
+        prisma.kelompok.findMany({
+          select: {
+            instansi: true,
+          },
+          distinct: ['instansi'],
+        }),
+  
+        // Count total participants
+        prisma.peserta.count(),
+  
+        // Get department statistics
+        prisma.peserta.groupBy({
+          by: ['jurusan'],
+          _count: {
+            jurusan: true,
+          },
+        })
+      ]);
+  
+      const response = {
+        total_instansi: uniqueInstitutions.length,
+        total_peserta: totalParticipants,
+        total_jurusan: departmentStats.length,
+        statistik: {
+          instansi: uniqueInstitutions.map(item => item.instansi),
+          jurusan: departmentStats.map(stat => ({
+            nama: stat.jurusan,
+            jumlah: stat._count.jurusan
+          }))
+        }
+      };
+  
+      return res.status(200).json({
+        status: 'success',
+        data: response
+      });
+  
+    } catch (error) {
+      console.error('Public Analytics Error:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Terjadi kesalahan saat mengambil data'
+      });
+    }
+  };
 
 
-module.exports = { login, logout, refreshAccessToken,sendOTP,resetPassword };
+
+
+
+
+
+module.exports = { login, logout, refreshAccessToken,sendOTP,resetPassword,getPublicAnalytics };
