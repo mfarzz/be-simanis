@@ -300,14 +300,9 @@ const createTugas = async (req, res) => {
             }
         });
 
-        if (tugas.length === 0) {
-            return res.status(404).json({
-                message: "Belum ada tugas yang ditambahkan"
-            });
-        }
-
+        // Mengembalikan status 200 baik ada data maupun tidak
         return res.status(200).json({
-            message: "Data tugas berhasil diambil",
+            message: tugas.length === 0 ? "Belum ada tugas yang ditambahkan" : "Data tugas berhasil diambil",
             data: tugas
         });
 

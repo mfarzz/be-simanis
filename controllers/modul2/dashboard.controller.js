@@ -3,10 +3,34 @@ const prisma = new PrismaClient()
 
 const getUnitKerjaStatistics = async (req, res) => {
     try {
-        // Get year from query parameter, default to current year if not provided
         const targetYear = parseInt(req.query.year) || new Date().getFullYear();
 
-        // Hitung total peserta (Aktif + Nonaktif) untuk tahun tertentu
+        // Cek apakah ada data peserta sama sekali
+        const pesertaExists = await prisma.peserta.count();
+
+        // Jika tidak ada data sama sekali, kembalikan data kosong
+        if (pesertaExists === 0) {
+            const emptyResult = {
+                statistics: [],
+                totalDivisi: 0,
+                totalPesertaTahunIni: 0,
+                yearlyRegistrations: [],
+                peserta_summary: {
+                    Aktif: 0,
+                    Nonaktif: 0
+                },
+                peserta_aktif: 0,
+                peserta_nonaktif: 0,
+                targetYear
+            };
+
+            return res.status(200).json({
+                message: `Belum ada data peserta untuk tahun ${targetYear}`,
+                data: emptyResult,
+            });
+        }
+
+        // Hitung total peserta untuk tahun tertentu
         const totalPesertaTahunIni = await prisma.peserta.count({
             where: {
                 createdAt: {
@@ -16,7 +40,7 @@ const getUnitKerjaStatistics = async (req, res) => {
             }
         });
 
-        // Hitung jumlah peserta berdasarkan status untuk tahun tertentu
+        // Status statistics
         const statusStats = await prisma.peserta.groupBy({
             by: ['status_peserta'],
             _count: {
@@ -30,7 +54,6 @@ const getUnitKerjaStatistics = async (req, res) => {
             }
         });
 
-        // Format status peserta statistics
         const peserta_summary = statusStats.reduce((acc, stat) => {
             acc[stat.status_peserta] = stat._count.id;
             return acc;
@@ -39,7 +62,7 @@ const getUnitKerjaStatistics = async (req, res) => {
             Nonaktif: 0
         });
 
-        // Pertama, dapatkan total peserta AKTIF yang unit_kerja nya null untuk tahun tertentu
+        // Null unit_kerja count
         const nullCount = await prisma.peserta.count({
             where: {
                 unit_kerja: null,
@@ -51,7 +74,7 @@ const getUnitKerjaStatistics = async (req, res) => {
             }
         });
 
-        // Query untuk menghitung jumlah peserta AKTIF berdasarkan unit_kerja yang tidak null
+        // Unit kerja statistics
         const statistics = await prisma.peserta.groupBy({
             by: ['unit_kerja'],
             _count: {
@@ -72,25 +95,50 @@ const getUnitKerjaStatistics = async (req, res) => {
             }
         });
 
-        // Get yearly registration statistics using raw SQL
-        const yearlyStats = await prisma.$queryRaw`
-            SELECT 
-                EXTRACT(YEAR FROM "createdAt") as year,
-                COUNT(*) as total,
-                COUNT(CASE WHEN status_peserta = 'Aktif' THEN 1 END) as aktif_count,
-                COUNT(CASE WHEN status_peserta = 'Nonaktif' THEN 1 END) as nonaktif_count
+        // Get all years where we have data
+        const years = await prisma.$queryRaw`
+            SELECT DISTINCT EXTRACT(YEAR FROM "createdAt") as year
             FROM "Peserta"
-            GROUP BY EXTRACT(YEAR FROM "createdAt")
             ORDER BY year DESC
         `;
 
-        // Format hasil statistik per unit kerja
+        // Get yearly statistics
+        const yearlyRegistrations = await Promise.all(
+            years.map(async ({ year }) => {
+                const yearStart = new Date(`${year}-01-01`);
+                const yearEnd = new Date(`${year}-12-31`);
+
+                const yearStats = await prisma.peserta.groupBy({
+                    by: ['status_peserta'],
+                    _count: {
+                        id: true
+                    },
+                    where: {
+                        createdAt: {
+                            gte: yearStart,
+                            lte: yearEnd
+                        }
+                    }
+                });
+
+                const aktif = yearStats.find(stat => stat.status_peserta === 'Aktif')?._count.id || 0;
+                const nonaktif = yearStats.find(stat => stat.status_peserta === 'Nonaktif')?._count.id || 0;
+
+                return {
+                    year: Number(year),
+                    total: aktif + nonaktif,
+                    aktif,
+                    nonaktif
+                };
+            })
+        );
+
+        // Format unit kerja statistics
         let formattedStatistics = statistics.map((stat) => ({
             unitKerja: stat.unit_kerja,
             count: stat._count.unit_kerja,
         }));
 
-        // Tambahkan data untuk unit kerja yang null (hanya yang aktif)
         if (nullCount > 0) {
             formattedStatistics.push({
                 unitKerja: 'Tidak Ditentukan',
@@ -98,18 +146,8 @@ const getUnitKerjaStatistics = async (req, res) => {
             });
         }
 
-        // Hitung total divisi (TIDAK termasuk kategori 'Tidak Ditentukan')
         const totalDivisi = statistics.length;
 
-        // Format yearly statistics dengan detail status
-        const yearlyRegistrations = yearlyStats.map(stat => ({
-            year: Number(stat.year),
-            total: Number(stat.total),
-            aktif: Number(stat.aktif_count),
-            nonaktif: Number(stat.nonaktif_count)
-        }));
-
-        // Gabungkan hasil
         const result = {
             statistics: formattedStatistics,
             totalDivisi,
@@ -129,6 +167,7 @@ const getUnitKerjaStatistics = async (req, res) => {
         console.error("Error fetching unit kerja statistics:", error);
         res.status(500).json({
             message: "Terjadi kesalahan saat mengambil data",
+            error: error.message
         });
     }
 };
