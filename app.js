@@ -16,7 +16,6 @@ var app = express();
 
 dotenv.config();
 
-
 app.use(cors({
   origin: process.env.CORS_ORIGIN,
   credentials: true,
@@ -61,6 +60,27 @@ app.use(function(err, req, res, next) {
     message: err.message,
     status: err.status || 500,
     // Only include error details in development
+    ...(process.env.NODE_ENV === 'development' && { error: err })
+  });
+});
+
+// Tambahkan di bagian atas setelah inisialisasi app
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Tambahkan logging untuk error handler
+app.use(function(err, req, res, next) {
+  console.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    status: err.status || 500
+  });
+  
+  res.status(err.status || 500).json({
+    message: err.message,
+    status: err.status || 500,
     ...(process.env.NODE_ENV === 'development' && { error: err })
   });
 });

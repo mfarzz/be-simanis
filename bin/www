@@ -26,7 +26,23 @@ var server = http.createServer(app);
  */
 
 server.listen(port);
-server.on('error', onError);
+// Tambahkan setelah var server = http.createServer(app);
+server.on('error', (error) => {
+  console.error('Server error:', error);
+});
+
+// Modifikasi function onListening
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  console.log('Server info:', {
+    environment: process.env.NODE_ENV,
+    port: addr.port,
+    address: addr.address
+  });
+}
 server.on('listening', onListening);
 
 /**
