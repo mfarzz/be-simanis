@@ -23,23 +23,26 @@ const storage = multer.diskStorage({
     },
 });
 
-// Ekspor instance Multer, bukan middleware
+
+// Konfigurasi filter file
+const fileFilter = (req, file, cb) => {
+    const fileTypes = /docx/;
+    const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (mimetype && extname) {
+        cb(null, true);
+    } else {
+        cb(new Error('Hanya file .docx yang diizinkan!'), false);
+    }
+};
+
+// Buat instance multer dengan konfigurasi
 const templates = multer({
-    storage: storage,
-    fileFilter: (req, file, cb) => {
-        const fileTypes = /docx/;
-        const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-        if (mimetype && extname) {
-            cb(null, true);
-        } else {
-            req.fileValidationError = 'Hanya file .docx yang diizinkan!';
-            return cb(new Error('Hanya file .docx yang diizinkan!'), false);
-        }
-    },
-    limits: {
-        fileSize: 5 * 1024 * 1024,
-    },
+    storage,
+    fileFilter,
 });
 
-module.exports = { templates };
+// Ekspor instance multer agar metode seperti `single` dapat digunakan
+module.exports = templates;
+
