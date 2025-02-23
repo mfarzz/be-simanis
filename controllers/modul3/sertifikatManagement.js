@@ -2,7 +2,10 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { transporter, EMAIL_USER } = require('../../middlewares/transporter.middleware');
 const path = require('path');
+const mammoth = require('mammoth');
+const fs = require('fs').promises; // Pakai promises langsung dari fs
 // Di bagian atas file, setelah require
+const libre = require('libreoffice-convert');
 const util = require('util');
 libre.convertAsync = util.promisify(libre.convert);
 //gabung
