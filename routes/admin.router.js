@@ -74,6 +74,7 @@ router.put('/mark-all/read-all', auth(['Admin']), markAllNotificationsAsRead);
 
 
 //done sampai notif, akun dan juga perbaikan di sertif buat ngirim ke email
+//return
 
 //logbooks
 router.get('/all-logbooks', auth(['Admin']), getAllLogbooks);
