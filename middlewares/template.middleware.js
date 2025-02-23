@@ -2,8 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Pastikan direktori ada
 const uploadDir = 'uploads/templates';
+
 (async () => {
     try {
         await fs.mkdir(uploadDir, { recursive: true });
@@ -15,7 +15,7 @@ const uploadDir = 'uploads/templates';
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir); // Samakan struktur dengan foto
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -23,6 +23,7 @@ const storage = multer.diskStorage({
     },
 });
 
+// Ekspor instance Multer, bukan middleware
 const templates = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
@@ -37,8 +38,8 @@ const templates = multer({
         }
     },
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit, sama seperti foto
+        fileSize: 5 * 1024 * 1024,
     },
-}).single('template'); // 'template' sebagai field name di form
+});
 
 module.exports = { templates };
