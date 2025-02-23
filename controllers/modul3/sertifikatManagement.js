@@ -4,30 +4,16 @@ const { transporter, EMAIL_USER } = require('../../middlewares/transporter.middl
 const path = require('path');
 const mammoth = require('mammoth');
 const fs = require('fs').promises; // Pakai promises langsung dari fs
-// Di bagian atas file, setelah require
 const libre = require('libreoffice-convert');
 const util = require('util');
+
+// Konversi libre.convert ke async menggunakan promisify
 libre.convertAsync = util.promisify(libre.convert);
-//gabung
 
 // Tentukan path ke LibreOffice binary
 const LIBREOFFICE_PATH = process.platform === 'win32' 
   ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'  // Windows
   : '/usr/bin/soffice'; // Linux/Mac
-
-// Modifikasi bagian konversi dalam fungsi uploadTemplate
-try {
-    pdfBuffer = await libre.convertAsync(docxFile, '.pdf', undefined, {
-        binary: LIBREOFFICE_PATH
-    });
-    if (!pdfBuffer) throw new Error('Hasil konversi PDF kosong');
-} catch (conversionError) {
-    console.error('Error saat mengkonversi file:', conversionError);
-    throw new Error(`Gagal mengkonversi file ke PDF: ${conversionError.message}`);
-}
-
-// Convert libreoffice-convert ke promise
-const convertAsync = util.promisify(libre.convert);
 
 // Pastikan direktori ada sebelum memulai
 const uploadDir = 'uploads/templates/';
@@ -39,6 +25,24 @@ const uploadDir = 'uploads/templates/';
         console.error('Gagal membuat direktori upload:', err);
     }
 })();
+
+// Fungsi async untuk mengonversi file DOCX ke PDF
+async function convertDocxToPDF(docxFile) {
+    try {
+        const pdfBuffer = await libre.convertAsync(docxFile, '.pdf', undefined, {
+            binary: LIBREOFFICE_PATH
+        });
+        
+        if (!pdfBuffer) {
+            throw new Error('Hasil konversi PDF kosong');
+        }
+        
+        return pdfBuffer;
+    } catch (conversionError) {
+        console.error('Error saat mengkonversi file:', conversionError);
+        throw new Error(`Gagal mengkonversi file ke PDF: ${conversionError.message}`);
+    }
+}
 
 const uploadTemplate = async (req, res) => {
     let previewPath = '';
@@ -73,14 +77,7 @@ const uploadTemplate = async (req, res) => {
         const docxFile = await fs.readFile(filePath);
 
         // Convert DOCX ke PDF
-        let pdfBuffer;
-        try {
-            pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
-            if (!pdfBuffer) throw new Error('Hasil konversi PDF kosong');
-        } catch (conversionError) {
-            console.error('Error saat mengkonversi file:', conversionError);
-            throw new Error('Gagal mengkonversi file ke PDF');
-        }
+        const pdfBuffer = await convertDocxToPDF(docxFile);
 
         // Simpan PDF preview
         await fs.writeFile(previewPath, pdfBuffer);
