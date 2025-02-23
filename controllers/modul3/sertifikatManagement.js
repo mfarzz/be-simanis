@@ -22,11 +22,9 @@ const uploadTemplate = async (req, res) => {
         filePath = req.file.path;
         console.log('Template disimpan di:', filePath);
 
-        // Cek file ada
         await fs.access(filePath, fs.constants.F_OK);
         console.log('File template ditemukan di:', filePath);
 
-        // Buat preview path
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         previewPath = path.join(
             'uploads/templates',
