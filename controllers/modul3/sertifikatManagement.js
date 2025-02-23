@@ -1,23 +1,30 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
-const {
-    transporter,
-    EMAIL_USER,
-} = require("../../middlewares/transporter.middleware");
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+const { transporter, EMAIL_USER } = require('../../middlewares/transporter.middleware');
 const path = require('path');
-const mammoth = require("mammoth");
+const mammoth = require('mammoth');
 const libre = require('libreoffice-convert');
-const fs = require('fs');
+const fs = require('fs').promises; // Pakai promises langsung dari fs
 const util = require('util');
 
-// Convert fs functions to use promises
-const readFileAsync = util.promisify(fs.readFile);
-const writeFileAsync = util.promisify(fs.writeFile);
+// Convert libreoffice-convert ke promise
 const convertAsync = util.promisify(libre.convert);
+
+// Pastikan direktori ada sebelum memulai
+const uploadDir = 'uploads/templates/';
+(async () => {
+    try {
+        await fs.mkdir(uploadDir, { recursive: true });
+        console.log('Direktori uploads/templates berhasil dibuat atau sudah ada');
+    } catch (err) {
+        console.error('Gagal membuat direktori upload:', err);
+    }
+})();
 
 const uploadTemplate = async (req, res) => {
     let previewPath = '';
-    
+    let filePath = '';
+
     try {
         // Validasi apakah file diupload
         if (!req.file) {
@@ -28,27 +35,36 @@ const uploadTemplate = async (req, res) => {
         const { nama } = req.body;
 
         // Tentukan path file yang diupload
-        const filePath = req.file.path;
-        
-        // Generate preview path (PDF) - simpan di folder yang sama dengan template
+        filePath = req.file.path;
+
+        // Cek apakah file benar-benar ada
+        try {
+            await fs.access(filePath, fs.constants.F_OK);
+        } catch (err) {
+            throw new Error('File yang diunggah tidak ditemukan di server');
+        }
+
+        // Generate preview path (PDF)
         previewPath = path.join(
-            'uploads/templates',
+            uploadDir,
             `preview_${path.basename(req.file.filename, '.docx')}.pdf`
         );
 
         // Baca file DOCX
-        const docxFile = await readFileAsync(filePath);
-        
+        const docxFile = await fs.readFile(filePath);
+
+        // Convert DOCX ke PDF
+        let pdfBuffer;
         try {
-            // Convert DOCX ke PDF
-            const pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
-            
-            // Simpan PDF preview
-            await writeFileAsync(previewPath, pdfBuffer);
+            pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
+            if (!pdfBuffer) throw new Error('Hasil konversi PDF kosong');
         } catch (conversionError) {
-            console.error('Error converting file:', conversionError);
+            console.error('Error saat mengkonversi file:', conversionError);
             throw new Error('Gagal mengkonversi file ke PDF');
         }
+
+        // Simpan PDF preview
+        await fs.writeFile(previewPath, pdfBuffer);
 
         // Simpan informasi template ke database
         const template = await prisma.templateSertifikat.create({
@@ -60,40 +76,47 @@ const uploadTemplate = async (req, res) => {
             },
         });
 
-        // Mengembalikan response dengan data template yang berhasil diupload
-        res.status(201).json({ 
-            message: 'Template berhasil diunggah', 
-            template 
+        // Response sukses
+        return res.status(201).json({
+            message: 'Template berhasil diunggah',
+            template,
         });
-        
+
     } catch (error) {
-        console.error('Error in uploadTemplate:', error);
-        
+        console.error('Error di uploadTemplate:', error);
+
         // Cleanup files jika terjadi error
         try {
-            if (req.file && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
+            if (filePath && (await fs.access(filePath).then(() => true).catch(() => false))) {
+                await fs.unlink(filePath);
             }
-            if (previewPath && fs.existsSync(previewPath)) {
-                fs.unlinkSync(previewPath);
+            if (previewPath && (await fs.access(previewPath).then(() => true).catch(() => false))) {
+                await fs.unlink(previewPath);
             }
         } catch (cleanupError) {
-            console.error('Error during cleanup:', cleanupError);
+            console.error('Error saat pembersihan:', cleanupError);
         }
 
+        // Penanganan error spesifik
         if (error.message.includes('PDF')) {
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Gagal membuat preview PDF',
-                details: error.message 
+                details: error.message,
             });
         }
-        
-        res.status(500).json({ 
-            error: 'Terjadi kesalahan saat mengunggah template'
+        if (error.code === 'ENOENT' || error.message.includes('tidak ditemukan')) {
+            return res.status(500).json({
+                error: 'File tidak ditemukan di server',
+                details: error.message,
+            });
+        }
+
+        return res.status(500).json({
+            error: 'Terjadi kesalahan saat mengunggah template',
+            details: error.message,
         });
     }
 };
-
 
 const previewTemplate = async (req, res) => {
     try {
