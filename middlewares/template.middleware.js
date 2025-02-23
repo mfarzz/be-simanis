@@ -4,8 +4,6 @@ const path = require('path');
 // Konfigurasi penyimpanan file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Tentukan folder untuk menyimpan file yang diupload
-        cb(null, 'uploads/templates/');
     },
     filename: (req, file, cb) => {
         // Menentukan nama file yang unik berdasarkan timestamp

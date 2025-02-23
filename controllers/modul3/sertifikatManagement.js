@@ -1,56 +1,46 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const {
-    transporter,
-    EMAIL_USER,
-} = require("../../middlewares/transporter.middleware");
+
 const path = require('path');
-const mammoth = require("mammoth");
+
+const fs = require('fs').promises; // Pakai promises langsung dari fs
 const libre = require('libreoffice-convert');
-const fs = require('fs');
+
 const util = require('util');
 
-// Convert fs functions to use promises
-const readFileAsync = util.promisify(fs.readFile);
-const writeFileAsync = util.promisify(fs.writeFile);
-const convertAsync = util.promisify(libre.convert); // Pastikan ini didefinisikan sebelum digunakan
+
 
 const uploadTemplate = async (req, res) => {
     let previewPath = '';
-    
+    let filePath = '';
+
     try {
-        // Validasi apakah file diupload
         if (!req.file) {
             return res.status(400).json({ message: 'File template tidak ditemukan' });
         }
 
-        // Ambil nama template dari body request
         const { nama } = req.body;
+        filePath = req.file.path;
+        console.log('Template disimpan di:', filePath);
 
-        // Tentukan path file yang diupload
-        const filePath = req.file.path;
-        
-        // Generate preview path (PDF) - simpan di folder yang sama dengan template
+        await fs.access(filePath, fs.constants.F_OK);
+        console.log('File template ditemukan di:', filePath);
+
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         previewPath = path.join(
             'uploads/templates',
-            `preview_${path.basename(req.file.filename, '.docx')}.pdf`
+            `preview-${uniqueSuffix}.pdf`
         );
 
-        // Baca file DOCX
-        const docxFile = await readFileAsync(filePath);
-        
-        try {
-            // Convert DOCX ke PDF
-            const pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
-            
-            // Simpan PDF preview
-            await writeFileAsync(previewPath, pdfBuffer);
-        } catch (conversionError) {
-            console.error('Error converting file:', conversionError);
-            throw new Error('Gagal mengkonversi file ke PDF');
-        }
+        const docxFile = await fs.readFile(filePath);
+        const pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
+        if (!pdfBuffer) throw new Error('Konversi PDF gagal');
 
-        // Simpan informasi template ke database
+
+
+        await fs.writeFile(previewPath, pdfBuffer);
+        console.log('Preview PDF disimpan di:', previewPath);
+
         const template = await prisma.templateSertifikat.create({
             data: {
                 nama,
@@ -60,40 +50,31 @@ const uploadTemplate = async (req, res) => {
             },
         });
 
-        // Mengembalikan response dengan data template yang berhasil diupload
-        res.status(201).json({ 
-            message: 'Template berhasil diunggah', 
-            template 
+        return res.status(201).json({
+            message: 'Template berhasil diunggah',
+            template,
         });
-        
+
     } catch (error) {
-        console.error('Error in uploadTemplate:', error);
-        
-        // Cleanup files jika terjadi error
+        console.error('Error uploadTemplate:', error);
+
         try {
-            if (req.file && fs.existsSync(req.file.path)) {
-                fs.unlinkSync(req.file.path);
+            if (filePath && (await fs.access(filePath).then(() => true).catch(() => false))) {
+                await fs.unlink(filePath);
             }
-            if (previewPath && fs.existsSync(previewPath)) {
-                fs.unlinkSync(previewPath);
+            if (previewPath && (await fs.access(previewPath).then(() => true).catch(() => false))) {
+                await fs.unlink(previewPath);
             }
         } catch (cleanupError) {
-            console.error('Error during cleanup:', cleanupError);
+            console.error('Error cleanup:', cleanupError);
         }
 
-        if (error.message.includes('PDF')) {
-            return res.status(500).json({ 
-                error: 'Gagal membuat preview PDF',
-                details: error.message 
-            });
-        }
-        
-        res.status(500).json({ 
-            error: 'Terjadi kesalahan saat mengunggah template'
+        return res.status(500).json({
+            error: 'Gagal mengunggah template',
+            details: error.message,
         });
     }
 };
-
 
 const previewTemplate = async (req, res) => {
     try {
