@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 const {
     transporter,
     EMAIL_USER,
@@ -10,12 +10,10 @@ const libre = require('libreoffice-convert');
 const fs = require('fs');
 const util = require('util');
 
-
 // Convert fs functions to use promises
 const readFileAsync = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
-const convertAsync = util.promisify(libre.convert);
-//balik lagi ke awal kuy
+const convertAsync = util.promisify(libre.convert); // Pastikan ini didefinisikan sebelum digunakan
 
 const uploadTemplate = async (req, res) => {
     let previewPath = '';
