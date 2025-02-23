@@ -8,7 +8,6 @@ const fs = require('fs').promises; // Pakai promises langsung dari fs
 const libre = require('libreoffice-convert');
 
 const util = require('util');
-//nomammoth
 
 // Konversi libre.convert ke async menggunakan promisify
 libre.convertAsync = util.promisify(libre.convert);
@@ -72,6 +71,7 @@ const uploadTemplate = async (req, res) => {
         const docxFile = await fs.readFile(filePath);
         const pdfBuffer = await convertAsync(docxFile, '.pdf', undefined);
         if (!pdfBuffer) throw new Error('Konversi PDF gagal');
+
 
 
         await fs.writeFile(previewPath, pdfBuffer);
