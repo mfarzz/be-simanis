@@ -2,29 +2,27 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Definisikan uploadDir di scope global
-const uploadDir = 'uploads/templates/';
 
-// Pastikan direktori upload ada
 (async () => {
     try {
         await fs.mkdir(uploadDir, { recursive: true });
-        console.log('Direktori uploads/templates berhasil dibuat atau sudah ada');
+
+
     } catch (err) {
-        console.error('Gagal membuat direktori upload:', err);
+        console.error('Gagal membuat direktori templates:', err);
     }
 })();
 
-// Konfigurasi penyimpanan
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir); // Gunakan uploadDir yang sudah didefinisikan
     },
     filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${file.originalname}`;
-        cb(null, uniqueName);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `template-${uniqueSuffix}${path.extname(file.originalname)}`);
     },
 });
+
 
 // Konfigurasi filter file
 const fileFilter = (req, file, cb) => {
@@ -50,3 +48,4 @@ const templates = multer({
 
 // Ekspor instance multer agar metode seperti `single` dapat digunakan
 module.exports = templates;
+
