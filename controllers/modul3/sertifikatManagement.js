@@ -9,42 +9,6 @@ const libre = require('libreoffice-convert');
 
 const util = require('util');
 
-// Konversi libre.convert ke async menggunakan promisify
-libre.convertAsync = util.promisify(libre.convert);
-
-// Tentukan path ke LibreOffice binary
-const LIBREOFFICE_PATH = process.platform === 'win32' 
-  ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'  // Windows
-  : '/usr/bin/soffice'; // Linux/Mac
-
-// Pastikan direktori ada sebelum memulai
-const uploadDir = 'uploads/templates/';
-(async () => {
-    try {
-        await fs.mkdir(uploadDir, { recursive: true });
-        console.log('Direktori uploads/templates berhasil dibuat atau sudah ada');
-    } catch (err) {
-        console.error('Gagal membuat direktori upload:', err);
-    }
-})();
-
-// Fungsi async untuk mengonversi file DOCX ke PDF
-async function convertDocxToPDF(docxFile) {
-    try {
-        const pdfBuffer = await libre.convertAsync(docxFile, '.pdf', undefined, {
-            binary: LIBREOFFICE_PATH
-        });
-        
-        if (!pdfBuffer) {
-            throw new Error('Hasil konversi PDF kosong');
-        }
-        
-        return pdfBuffer;
-    } catch (conversionError) {
-        console.error('Error saat mengkonversi file:', conversionError);
-        throw new Error(`Gagal mengkonversi file ke PDF: ${conversionError.message}`);
-    }
-}
 
 const uploadTemplate = async (req, res) => {
     let previewPath = '';
