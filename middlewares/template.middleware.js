@@ -1,32 +1,42 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs').promises; // Pakai promises untuk operasi file async
 
-// Konfigurasi penyimpanan file
+// Pastikan direktori upload ada
+const uploadDir = 'uploads/templates/';
+(async () => {
+    try {
+        await fs.mkdir(uploadDir, { recursive: true });
+    } catch (err) {
+        console.error('Gagal membuat direktori upload:', err);
+    }
+})();
+
+// Konfigurasi penyimpanan
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Tentukan folder untuk menyimpan file yang diupload
-        cb(null, 'uploads/templates/');
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        // Menentukan nama file yang unik berdasarkan timestamp
-        cb(null, `${Date.now()}-${file.originalname}`);
+        const uniqueName = `${Date.now()}-${file.originalname}`;
+        cb(null, uniqueName);
     },
 });
 
-// Setup multer untuk menerima file dengan ekstensi .docx
+// Setup multer
 const templates = multer({
     storage,
     fileFilter: (req, file, cb) => {
         const fileTypes = /docx/;
         const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-    
+
         if (mimetype && extname) {
             cb(null, true);
         } else {
-            cb(new Error('Hanya file dengan format .docx yang diizinkan!'), false);
+            cb(new Error('Hanya file .docx yang diizinkan!'), false);
         }
-    }
+    },
 });
 
 module.exports = templates;
