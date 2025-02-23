@@ -1,32 +1,51 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs').promises;
 
-// Konfigurasi penyimpanan file
+
+(async () => {
+    try {
+        await fs.mkdir(uploadDir, { recursive: true });
+
+
+    } catch (err) {
+        console.error('Gagal membuat direktori templates:', err);
+    }
+})();
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Tentukan folder untuk menyimpan file yang diupload
-        cb(null, 'uploads/templates/');
+        cb(null, uploadDir); // Gunakan uploadDir yang sudah didefinisikan
     },
     filename: (req, file, cb) => {
-        // Menentukan nama file yang unik berdasarkan timestamp
-        cb(null, `${Date.now()}-${file.originalname}`);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `template-${uniqueSuffix}${path.extname(file.originalname)}`);
     },
 });
 
-// Setup multer untuk menerima file dengan ekstensi .docx
+
+// Konfigurasi filter file
+const fileFilter = (req, file, cb) => {
+    const fileTypes = /\.docx$/; // Hanya izinkan file dengan ekstensi .docx
+    const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+
+    if (mimetype && extname) {
+        cb(null, true);
+    } else {
+        cb(new Error('Hanya file .docx yang diizinkan!'), false);
+    }
+};
+
+// Buat instance multer dengan konfigurasi
 const templates = multer({
     storage,
-    fileFilter: (req, file, cb) => {
-        const fileTypes = /docx/;
-        const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-    
-        if (mimetype && extname) {
-            cb(null, true);
-        } else {
-            cb(new Error('Hanya file dengan format .docx yang diizinkan!'), false);
-        }
-    }
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // Batasi ukuran file maksimal 5MB
+    },
 });
 
+// Ekspor instance multer agar metode seperti `single` dapat digunakan
 module.exports = templates;
+
