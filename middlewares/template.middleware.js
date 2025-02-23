@@ -1,14 +1,19 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Pastikan direktori uploads/templates ada
+const uploadDir = path.join(__dirname, '..', 'uploads', 'templates');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Konfigurasi penyimpanan file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Tentukan folder untuk menyimpan file yang diupload
-        cb(null, 'uploads/templates/');
+        cb(null, uploadDir); // Gunakan variabel uploadDir
     },
     filename: (req, file, cb) => {
-        // Menentukan nama file yang unik berdasarkan timestamp
         cb(null, `${Date.now()}-${file.originalname}`);
     },
 });
