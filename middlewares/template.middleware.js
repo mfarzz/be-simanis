@@ -3,7 +3,6 @@ const path = require('path');
 const fs = require('fs').promises;
 
 
-
 (async () => {
     try {
         await fs.mkdir(uploadDir, { recursive: true });
@@ -16,7 +15,7 @@ const fs = require('fs').promises;
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir);
+        cb(null, uploadDir); // Gunakan uploadDir yang sudah didefinisikan
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
