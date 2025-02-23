@@ -2,12 +2,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 
-const uploadDir = 'uploads/templates';
+
 
 (async () => {
     try {
         await fs.mkdir(uploadDir, { recursive: true });
-        console.log('Direktori uploads/templates dibuat');
+
+
     } catch (err) {
         console.error('Gagal membuat direktori templates:', err);
     }
@@ -26,7 +27,7 @@ const storage = multer.diskStorage({
 
 // Konfigurasi filter file
 const fileFilter = (req, file, cb) => {
-    const fileTypes = /docx/;
+    const fileTypes = /\.docx$/; // Hanya izinkan file dengan ekstensi .docx
     const mimetype = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
 
@@ -41,6 +42,9 @@ const fileFilter = (req, file, cb) => {
 const templates = multer({
     storage,
     fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // Batasi ukuran file maksimal 5MB
+    },
 });
 
 // Ekspor instance multer agar metode seperti `single` dapat digunakan
