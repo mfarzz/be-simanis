@@ -8,6 +8,7 @@ const fs = require('fs').promises; // Pakai promises langsung dari fs
 const libre = require('libreoffice-convert');
 const util = require('util');
 libre.convertAsync = util.promisify(libre.convert);
+//gabung
 
 // Tentukan path ke LibreOffice binary
 const LIBREOFFICE_PATH = process.platform === 'win32' 
