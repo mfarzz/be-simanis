@@ -4,7 +4,7 @@ var { auth } = require('../middlewares/auth.middleware');
 var { approveKelompok, rejectKelompok, getKelompokList, searchKelompok, previewDocument,downloadDocument, getAdminNotifications, markNotificationAsRead, markAllNotificationsAsRead } = require('../controllers/modul1/statusRegistrasiKelompok');
 var {createPegawai, getAllPegawai, editPegawai, deletePegawai, getAllAccount} = require('../controllers/modul1/pengelolaanAkun.controller')
 
-const { getAllBiodata, addBiodata,deleteBiodata, deletePeserta } = require('../controllers/modul3/managementBiodata');
+const { getAllBiodata, addBiodata,deleteBiodata, deletePeserta, listPesertaAktif } = require('../controllers/modul3/managementBiodata');
 var {createTugas,editTugas, deleteTugas, getAllTugas} = require('../controllers/modul2/managementTugas.controller')
 var {getUnitKerjaStatistics, getStatistikHarian,getStatistikBulanan,getStatistikTahunan, getStatistikMingguan} = require('../controllers/modul2/dashboard.controller')
 var {uploadTemplate, getAllTemplates, chooseOneTemplate, deleteTemplate, generateSertifikat, downloadSertifikat, editTemplate, getTemplatePreview, previewTemplate} = require('../controllers/modul3/sertifikatManagement')
@@ -30,6 +30,7 @@ router.get('/download-surat/:filename', auth(['Admin']), downloadDocument);
 
 //biodata
 router.get('/list-biodata',auth(['Admin']), getAllBiodata);
+router.get('/list-peserta',auth(['Admin']), listPesertaAktif);
 router.delete('/delete-peserta/:pesertaId', auth(['Admin']), deletePeserta);
 router.put('/add-biodata/:pesertaId',upload,auth(['Admin']),addBiodata)
 router.delete('/delete-biodata/:pesertaId', auth(['Admin']), deleteBiodata);

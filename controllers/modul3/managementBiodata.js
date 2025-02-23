@@ -61,6 +61,67 @@ const getAllBiodata = async (req, res) => {
 };
 
 
+const listPesertaAktif = async (req, res) => {
+    try {
+        const { unit_kerja, sortBy = 'asc' } = req.query; 
+        
+        // Menyiapkan filter dengan status_peserta tetap Aktif
+        let whereClause = {
+            status_peserta: 'Aktif' // Hanya menampilkan peserta dengan status Aktif
+        };
+
+        // Menambahkan filter unit_kerja jika ada
+        if (unit_kerja) {
+            if (unit_kerja === "Tidak Ditentukan") {
+                whereClause.unit_kerja = null;
+            } else if (unit_kerja !== "") {
+                whereClause.unit_kerja = unit_kerja;
+            }
+        }
+
+        // Menyiapkan orderBy untuk sorting
+        let orderBy = {};
+        if (sortBy) {
+            orderBy.status_peserta = sortBy.toLowerCase();
+        }
+
+        // Ambil biodata peserta dengan filter dan sorting
+        const biodatas = await prisma.peserta.findMany({
+            where: whereClause,
+            orderBy: orderBy,
+            include: {
+                RiwayatPendidikan: true
+            }
+        });
+
+        // Hitung total peserta berdasarkan filter
+        const totalPeserta = await prisma.peserta.count({
+            where: whereClause
+        });
+
+        // Hitung jumlah peserta per divisi dan status
+        const divisiStats = await prisma.peserta.groupBy({
+            by: ['unit_kerja', 'status_peserta'],
+            _count: {
+                id: true
+            },
+            where: whereClause
+        });
+
+        res.status(200).json({
+            total: totalPeserta,
+            biodatas: biodatas,
+            divisiStats: divisiStats
+        });
+    } catch (error) {
+        res.status(500).json({
+            error: "Gagal mengambil data biodata",
+            details: error.message
+        });
+    }
+};
+
+
 
 const deletePeserta = async (req, res) => {
     const { pesertaId } = req.params;
@@ -233,6 +294,7 @@ const deleteBiodata = async (req, res) => {
  
  module.exports = {
     getAllBiodata,
+    listPesertaAktif,
     deletePeserta,
     addBiodata,
     deleteBiodata
