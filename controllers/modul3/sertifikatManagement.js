@@ -3,9 +3,27 @@ const prisma = new PrismaClient();
 const { transporter, EMAIL_USER } = require('../../middlewares/transporter.middleware');
 const path = require('path');
 const mammoth = require('mammoth');
-const libre = require('libreoffice-convert');
 const fs = require('fs').promises; // Pakai promises langsung dari fs
+// Di bagian atas file, setelah require
+const libre = require('libreoffice-convert');
 const util = require('util');
+libre.convertAsync = util.promisify(libre.convert);
+
+// Tentukan path ke LibreOffice binary
+const LIBREOFFICE_PATH = process.platform === 'win32' 
+  ? 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'  // Windows
+  : '/usr/bin/soffice'; // Linux/Mac
+
+// Modifikasi bagian konversi dalam fungsi uploadTemplate
+try {
+    pdfBuffer = await libre.convertAsync(docxFile, '.pdf', undefined, {
+        binary: LIBREOFFICE_PATH
+    });
+    if (!pdfBuffer) throw new Error('Hasil konversi PDF kosong');
+} catch (conversionError) {
+    console.error('Error saat mengkonversi file:', conversionError);
+    throw new Error(`Gagal mengkonversi file ke PDF: ${conversionError.message}`);
+}
 
 // Convert libreoffice-convert ke promise
 const convertAsync = util.promisify(libre.convert);
