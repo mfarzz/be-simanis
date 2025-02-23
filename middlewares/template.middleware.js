@@ -2,8 +2,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Pastikan direktori upload ada
+// Definisikan uploadDir di scope global
 const uploadDir = 'uploads/templates/';
+
+// Pastikan direktori upload ada
 (async () => {
     try {
         await fs.mkdir(uploadDir, { recursive: true });
@@ -16,7 +18,7 @@ const uploadDir = 'uploads/templates/';
 // Konfigurasi penyimpanan
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir);
+        cb(null, uploadDir); // Gunakan uploadDir yang sudah didefinisikan
     },
     filename: (req, file, cb) => {
         const uniqueName = `${Date.now()}-${file.originalname}`;
