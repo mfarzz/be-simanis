@@ -9,7 +9,6 @@ const mammoth = require("mammoth");
 const libre = require('libreoffice-convert');
 const fs = require('fs');
 const util = require('util');
-const util = require('util');
 
 
 // Convert fs functions to use promises
