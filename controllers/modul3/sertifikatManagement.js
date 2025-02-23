@@ -1,7 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const mammoth = require('mammoth');
-const { transporter, EMAIL_USER } = require('../../middlewares/transporter.middleware');
+
 const path = require('path');
 
 const fs = require('fs').promises; // Pakai promises langsung dari fs

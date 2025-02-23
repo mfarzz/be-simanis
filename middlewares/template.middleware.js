@@ -11,7 +11,7 @@ if (!fs.existsSync(uploadDir)) {
 // Konfigurasi penyimpanan file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir); // Gunakan variabel uploadDir
+
     },
     filename: (req, file, cb) => {
         cb(null, `${Date.now()}-${file.originalname}`);
