@@ -297,18 +297,13 @@ const searchKelompok = async (req, res) => {
 
 const previewDocument = async (req, res) => {
   try {
-    const { filename } = req.params;
-
-    // Extract document type from filename
-    const isBalasan = filename.includes("surat_balasan");
-    const folderName = isBalasan ? "suratBalasan" : "suratPengantar";
-
-    // Construct path sesuai struktur folder
-    const filePath = path.join(process.cwd(), "uploads", folderName, filename);
-
-    // Debug log
+    const { filepath } = req.params;
+    
+    // Konstruksi path file
+    const filePath = path.join(process.cwd(), filepath);
+    
     console.log("Accessing file:", filePath);
-
+    
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       console.log("File not found:", filePath);
@@ -332,7 +327,7 @@ const previewDocument = async (req, res) => {
 
     // Set response headers
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${path.basename(filepath)}"`);
 
     // Stream the file
     const fileStream = fs.createReadStream(filePath);
