@@ -25,7 +25,7 @@ router.get('/list-kelompok',auth(['Admin']),getKelompokList)
 router.put('/approve-user/:id', auth(['Admin']), approveKelompok);
 router.put('/reject-user/:id', auth(['Admin']), rejectKelompok);
 router.get('/search-kelompok', auth(['Admin']), searchKelompok); //modul pengarsipan surat bisa seacrhing berdasarkan gmail, nama ketua, dan instansi
-router.get('/preview-surat/:filename', auth(['Admin']), previewDocument);
+router.get('/preview-surat/:filepath(*)', auth(['Admin']), previewDocument);
 router.get('/download-surat/:filename', auth(['Admin']), downloadDocument);
 
 //biodata
